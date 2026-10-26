@@ -1,0 +1,6 @@
+- insert:
+    - id: dsh-codex-usage
+      name: '@local/dsh-codex-usage'
+      config:
+        timeoutMs: 15000
+        cacheMs: 60000

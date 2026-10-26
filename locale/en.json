@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "title": "Codex Usage",
+    "description": "Shows Codex five-hour and weekly usage limits in the sidebar."
+  },
+  "codexUsage": {
+    "title": "Codex usage",
+    "fiveHour": "5-hour limit",
+    "weekly": "Weekly limit",
+    "fiveHourShort": "5h",
+    "weeklyShort": "Week",
+    "used": "Used {percent}%",
+    "usedShort": "{percent}%",
+    "resetAt": "{time} Reset",
+    "resetShort": "{time} Reset",
+    "resetUnknown": "Reset time unavailable",
+    "unavailable": "Usage unavailable",
+    "loading": "Loading usage…",
+    "refresh": "Refresh Codex usage",
+    "updated": "Updated {time}",
+    "statusMissingCli": "Codex CLI was not found. Set its executable path in the bundle config.",
+    "statusCliWrapperUnsupported": "The resolved CLI is a .cmd/.bat wrapper. Configure a native codex.exe path.",
+    "statusNotAuthenticated": "Sign in to Codex with your ChatGPT account to read plan limits.",
+    "statusUnsupportedAuth": "API key sign-in does not provide ChatGPT plan limits.",
+    "statusTimeout": "Codex App Server did not respond in time.",
+    "statusProtocolError": "Codex App Server returned an unexpected response.",
+    "statusAccountUnavailable": "Codex account status could not be read.",
+    "statusRateLimitsUnavailable": "Codex usage limits are not available right now.",
+    "statusCliError": "Codex App Server could not be started.",
+    "statusUnavailable": "Codex usage could not be loaded."
+  }
+}

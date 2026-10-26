@@ -1,0 +1,44 @@
+{
+  "name": "@local/dsh-codex-usage",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shows Codex five-hour and weekly usage in the sidebar.",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.4.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./oauth": "./src/oauth.js",
+    "./shared": "./src/shared.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "src/oauth.js",
+    "src/shared.js",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
