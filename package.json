@@ -1,9 +1,13 @@
 {
   "name": "@local/dsh-codex-usage",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Shows Codex five-hour and weekly usage in the sidebar.",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "dsh": ">=0.2.0-rc.1"
+  },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0"
   },
@@ -26,7 +30,8 @@
     "src/shared.js",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {
