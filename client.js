@@ -289,6 +289,7 @@ window.__ModuleLoader__.load({
         h('style', null, `
           .dcu-settings { width: 100%; color: var(--dsw-alias-label-primary, inherit); font: inherit; }
           .dcu-settings * { box-sizing: border-box; }
+          .dcu-settings-title { margin: 0; color: var(--dsw-alias-label-primary, inherit); font-family: var(--dsw-font-family, inherit); font-size: 20px; font-weight: 600; line-height: 1.4; }
           .dcu-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.18)); }
           .dcu-settings-row:first-of-type { padding-top: 18px; }
           .dcu-settings-copy { flex: 1 1 auto; min-width: 0; }
@@ -316,6 +317,7 @@ window.__ModuleLoader__.load({
           .dcu-settings-error { color: var(--dsw-alias-state-error-primary, #c33); }
           @media (max-width: 480px) { .dcu-settings-row { gap: 12px; } .dcu-settings-form { flex-wrap: wrap; } .dcu-settings-form input { flex-basis: 100%; } }
         `),
+        h('h1', { className: 'dcu-settings-title' }, t('settingsTitle')),
         h('div', { className: 'dcu-settings-row' },
           h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label' }, t('account')),
