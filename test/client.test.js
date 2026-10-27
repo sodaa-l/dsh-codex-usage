@@ -68,6 +68,13 @@ test('registers settings and sidebar; persists display switches and handles week
   let switches = findNodes(settings, (node) => node.props?.role === 'switch');
   assert.equal(switches.length, 3);
   assert.ok(switches.every((node) => node.props.checked));
+  const masterSwitch = switches.find((node) => node.props.id === 'dcu-sidebar-enabled');
+  assert.equal(masterSwitch.props['aria-controls'], 'dcu-settings-display-children');
+  const childGroup = findNodes(settings, (node) => node.props?.role === 'group' && node.props.id === 'dcu-settings-display-children')[0];
+  assert.ok(childGroup);
+  assert.equal(childGroup.props['aria-labelledby'], 'dcu-sidebar-enabled-label');
+  assert.equal(childGroup.props['aria-disabled'], false);
+  assert.equal(findNodes(childGroup, (node) => node.props?.role === 'switch').length, 2);
   switches.find((node) => node.props.id === 'dcu-show-five-hour').props.onChange({ target: { checked: false } });
   assert.deepEqual(JSON.parse(stored.get('dsh-codex-usage.display-settings')), { enabled: true, showFiveHour: false, showWeekly: true });
   const hiddenFiveHour = JSON.stringify(sidebar({ wide: true }));
@@ -80,6 +87,11 @@ test('registers settings and sidebar; persists display switches and handles week
   switches = findNodes(settings, (node) => node.props?.role === 'switch');
   switches.find((node) => node.props.id === 'dcu-sidebar-enabled').props.onChange({ target: { checked: false } });
   assert.deepEqual(JSON.parse(stored.get('dsh-codex-usage.display-settings')), { enabled: false, showFiveHour: false, showWeekly: false });
+  settings = settingsComponent();
+  switches = findNodes(settings, (node) => node.props?.role === 'switch');
+  const disabledChildGroup = findNodes(settings, (node) => node.props?.role === 'group' && node.props.id === 'dcu-settings-display-children')[0];
+  assert.equal(disabledChildGroup.props['aria-disabled'], true);
+  assert.ok(switches.filter((node) => node.props.id !== 'dcu-sidebar-enabled').every((node) => node.props.disabled));
   assert.equal(sidebar({ wide: true }), null);
 });
 

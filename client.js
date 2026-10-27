@@ -325,7 +325,7 @@ window.__ModuleLoader__.load({
           h('label', { className: 'dcu-settings-label', id: `${id}-label`, htmlFor: id }, t(labelKey)),
           h('p', { className: 'dcu-settings-description' }, t(hintKey)),
           displaySaveError && key === 'enabled' ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
-        h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: displaySettings[key], 'aria-checked': displaySettings[key], 'aria-labelledby': `${id}-label`, onChange: (event) => changeDisplaySetting(key, event.target.checked) }));
+        h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: displaySettings[key], 'aria-checked': displaySettings[key], 'aria-labelledby': `${id}-label`, 'aria-controls': key === 'enabled' ? 'dcu-settings-display-children' : undefined, disabled: key !== 'enabled' && !displaySettings.enabled, onChange: (event) => changeDisplaySetting(key, event.target.checked) }));
 
       if (settings) return h('div', { className: 'dcu-settings' },
         h('style', null, `
@@ -348,6 +348,12 @@ window.__ModuleLoader__.load({
           .dcu-settings-switch:checked { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-brand-primary); }
           .dcu-settings-switch:checked::after { transform: translateX(18px); }
           .dcu-settings-switch:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+           .dcu-settings-switch:disabled { cursor: not-allowed; }
+           .dcu-settings-display-children { margin: 0 0 0 6px; padding-left: 14px; border-left: 2px solid var(--dsw-alias-border-l1, rgba(128,128,128,.18)); }
+           .dcu-settings-display-children[aria-disabled='true'] { opacity: .55; }
+           .dcu-settings-display-children .dcu-settings-row { padding: 16px 0; }
+           .dcu-settings-display-children .dcu-settings-row:last-child { border-bottom: 0; }
+
           @media (prefers-reduced-motion: reduce) { .dcu-settings-switch, .dcu-settings-switch::after { transition: none; } }
           .dcu-settings-select { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; }
           .dcu-settings-chevron { display: block; flex: 0 0 16px; width: 16px; height: 16px; }
@@ -385,8 +391,9 @@ window.__ModuleLoader__.load({
               h('input', { value: callbackUrl, onChange: (event) => setCallbackUrl(event.target.value), 'aria-label': t('manualPrompt'), autoComplete: 'off' }),
               h('button', { className: 'dcu-settings-button', type: 'submit', disabled: !callbackUrl.trim() }, t('submitCallback'))))) : null,
         displaySettingRow('enabled', 'sidebarDisplay', 'sidebarDisplayHint', 'dcu-sidebar-enabled'),
-        displaySettingRow('showFiveHour', 'fiveHourDisplay', 'fiveHourDisplayHint', 'dcu-show-five-hour'),
-        displaySettingRow('showWeekly', 'weeklyDisplay', 'weeklyDisplayHint', 'dcu-show-weekly'),
+        h('div', { id: 'dcu-settings-display-children', className: 'dcu-settings-display-children', role: 'group', 'aria-labelledby': 'dcu-sidebar-enabled-label', 'aria-disabled': !displaySettings.enabled },
+          displaySettingRow('showFiveHour', 'fiveHourDisplay', 'fiveHourDisplayHint', 'dcu-show-five-hour'),
+          displaySettingRow('showWeekly', 'weeklyDisplay', 'weeklyDisplayHint', 'dcu-show-weekly')),
         h('div', { className: 'dcu-settings-row' },
           h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label', id: 'dcu-refresh-label' }, t('refreshPeriod')),
