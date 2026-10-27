@@ -16,7 +16,7 @@
 
 启用插件后，在 DSH 设置中打开“Codex 额度显示”，点击“登录”，再用系统浏览器完成 OpenAI 授权。若浏览器没有自动打开，可点击设置页中的登录链接；若本机回调没有完成，可粘贴浏览器跳转后的完整地址。等待授权时可以取消登录，也可以随时退出账户。
 
-插件使用 DSH 凭据服务保存 `dsh-codex-usage/openai-codex` 账户凭据。令牌刷新由凭据服务串行写入；访问令牌留在 Host，不会传给侧栏 Client。使用本插件不需要 Codex CLI 或 `dsh-codex-subscription`。
+插件使用 DSH 凭据服务保存 `dsh-codex-usage/openai-codex` 账户凭据。令牌刷新由凭据服务串行写入；访问令牌留在 Host，不会传给侧栏 Client。使用本插件不需要 Codex CLI。
 
 ## 额度数据与配置
 
@@ -45,4 +45,4 @@ npm test
 
 ## 许可与标志
 
-插件采用 MIT 许可，见 [LICENSE](LICENSE)。侧栏使用用户提供的 OpenAI 标志包中的 OpenAI Blossom 矢量图形。OpenAI 和 Codex 名称及标志属于各自权利人。
+插件采用 MIT 许可，见 [LICENSE](LICENSE)。侧栏使用 OpenAI Blossom 矢量图形。OpenAI 和 Codex 名称及标志属于各自权利人。
