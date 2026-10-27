@@ -77,6 +77,12 @@ Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPerc
 3. 若改动 OAuth 或额度接口，使用可取消的 Host 请求验证未登录、错误、超时和退出登录路径；不要把令牌写入日志或测试快照。
 4. 若改动配置或 bundle 元数据，检查 `cordis.patch.yml`、`package.json` 和包文件清单彼此一致。
 
+### 插件图标元数据
+
+[package.json](../package.json) 同时声明顶层 `"icon": "./icon.svg"` 和 `exports` 中的 `"./package.json": "./package.json"`，并保留 `./icon` 导出。DSH 通过导出的包清单读取顶层图标路径；只加 `icon` 而不导出清单仍会回退到 `./icon`。本地依赖别名 `@local/dsh-codex-usage` 与清单名 `dsh-codex-usage` 不同时，该回退分支会因包名归属校验报错，不能仅靠把 `link:` 改成 `file:` 修复。
+
+[package-metadata.test.js](../test/package-metadata.test.js) 以实际本地别名布局验证清单与图标可解析。安装验收还应在新进程中调用本机 DSH 的真实 `readPluginMeta('@local/dsh-codex-usage', parentURL)`，确认没有 `error` 且 `icon` 是与原图字节一致的 SVG data URI；同时检查实际发布包和已安装包，不能用 `active` 或安装成功代替元数据验收。若旧进程仍保留包导出解析缓存，应完整重启 DSH 后复核界面。
+
 ## 决策索引
 
 | 编号 | 决策 | 状态 | 记录 |

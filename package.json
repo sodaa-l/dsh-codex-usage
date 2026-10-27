@@ -2,6 +2,7 @@
   "name": "dsh-codex-usage",
   "version": "0.1.0",
   "description": "Shows Codex five-hour and weekly usage in the sidebar.",
+  "icon": "./icon.svg",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -19,6 +20,7 @@
     "./client": "./client.js",
     "./oauth": "./src/oauth.js",
     "./shared": "./src/shared.js",
+    "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
