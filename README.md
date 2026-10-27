@@ -2,7 +2,9 @@
 
 `dsh-codex-usage` 是一个 DSH 侧栏插件，用来查看 ChatGPT Codex 账户的 5 小时和每周额度。卡片背景透明，显示剩余比例和重置时间，并沿用 DSH 的字体与主题色。
 
-![Codex 额度侧栏截图](assets/codex-usage.png)
+<p align="center">
+  <img src="assets/codex-usage.png" alt="Codex 额度侧栏截图" width="600">
+</p>
 
 ## 功能
 
