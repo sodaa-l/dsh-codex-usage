@@ -33,7 +33,7 @@ Host 是凭据和网络请求的唯一所有者。Client 通过 DSH 提供的同
 | 路径 | 职责 |
 | --- | --- |
 | `index.js` | Host 插件入口；读取配置，创建 OAuth 与用量服务，注册 `/api/dsh-codex-usage` 路由，并在 effect 清理时注销路由、取消登录及中止请求。 |
-| `client.js` | Web Client 入口；注册中英文字符串、设置页和侧栏卡片，处理刷新周期、登录交互、重试与渲染。 |
+| `client.js` | Web Client 入口；注册中英文字符串、设置页和侧栏卡片，处理刷新周期、显示开关、登录交互、重试与渲染。 |
 | `src/oauth.js` | 把 DSH credentials 服务适配为 pi-ai 凭据存储；执行浏览器 OAuth、读取有限账户资料、调用 WHAM 接口及规范化两个用量窗口。 |
 | `src/shared.js` | 定义安全的用量结果 DTO，并将状态限制为 OAuth/WHAM 路径支持的状态。 |
 | `locale/zh.json`, `locale/en.json` | 插件元数据使用的中英文资源。Client 界面的即时词条也在 `client.js` 的 `dictionaries` 中维护；修改界面文案时检查两处是否需要同步。 |
@@ -52,14 +52,14 @@ Host 注册两个同源路由：
 - `GET /api/dsh-codex-usage` 返回 `{ status, windows, checkedAt, expiresAt }`；加 `?refresh=1` 会跳过有效缓存。窗口字段为 `fiveHour` 和 `weekly`，每个值是 `{ usedPercent, resetsAt }` 或 `null`。
 - `/api/dsh-codex-usage/auth` 支持 `GET` 查询登录阶段和允许显示的账户资料；`POST` 的 `action` 为 `start`、`submit`、`cancel` 或 `logout`。响应设为 `no-store`。登录输入有长度限制。
 
-Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPercent` 转换为剩余比例 `100 - usedPercent`。未知窗口显示不可用；不要用估算值补齐。
+Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPercent` 转换为剩余比例 `100 - usedPercent`。成功响应含可识别的每周窗口但缺少 5 小时窗口时，5 小时行视为当前套餐未提供而隐藏；其他未知窗口仍显示不可用。不要用估算值补齐。
 
 ### Client 行为与 DSH 插槽
 
 - `package.json` 的 `dsh.client` 声明 Web 平台、立即加载，并注入 sidebar 与 locale Client 服务。
 - Client 等待 `sidebar.footer.action` 和 `settings.section` 这两个实际子插槽出现后再注册。不要只等待父级 `sidebar` 或 `sidebar.settings`：父级可能先于子级声明。
 - 侧栏卡片注册顺序为 `-1000`，设置页为 `35`。卡片通过局部 CSS 适配整行宽度，并使用 DSH 字体和主题 token。
-- 卡片挂载时读取一次；侧栏挂载期间按浏览器本地设置的间隔自动刷新。设置页提供手动刷新。可选间隔为 1、5、15、30 分钟，默认 1 分钟；值保存在当前浏览器的 `localStorage`。
+- 卡片挂载时读取一次；侧栏挂载且总开关开启期间，按浏览器本地设置的间隔自动刷新。关闭总开关会隐藏卡片并停止侧栏轮询。设置页提供侧栏总开关、5 小时/每周窗口单项开关和手动刷新。可选刷新间隔为 1、5、15、30 分钟，默认 1 分钟；间隔和三个显示开关默认均开启，并保存在当前浏览器的 `localStorage`。
 - OAuth 页面由用户点击登录时预先打开空白页，之后再导航到授权地址，以降低弹窗拦截概率。若自动回调无法完成，可提交浏览器重定向后的完整 URL。
 
 ## 维护约定与已知限制

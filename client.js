@@ -26,7 +26,7 @@ window.__ModuleLoader__.load({
         weeklyShort: 'Week',
         used: 'Remaining {percent}%',
         usedShort: '{percent}% left',
-        settingsTitle: 'Codex usage', account: 'Account', accountHint: 'Connect your ChatGPT account to view Codex limits.', refreshTitle: 'Refresh usage', refreshHint: 'Update the displayed limits now.', refreshPeriod: 'Refresh interval', everyMinute: '1 minute', everyFiveMinutes: '5 minutes', everyFifteenMinutes: '15 minutes', everyThirtyMinutes: '30 minutes', settingsHint: 'The interval is saved in this browser.', saveFailed: 'Could not save the interval in this browser.',
+        settingsTitle: 'Codex usage', account: 'Account', accountHint: 'Connect your ChatGPT account to view Codex limits.', sidebarDisplay: 'Sidebar display', sidebarDisplayHint: 'Show the Codex usage card in the sidebar.', fiveHourDisplay: '5-hour limit', fiveHourDisplayHint: 'Show the 5-hour limit in the sidebar.', weeklyDisplay: 'Weekly limit', weeklyDisplayHint: 'Show the weekly limit in the sidebar.', refreshTitle: 'Refresh usage', refreshHint: 'Update the displayed limits now.', refreshPeriod: 'Refresh interval', everyMinute: '1 minute', everyFiveMinutes: '5 minutes', everyFifteenMinutes: '15 minutes', everyThirtyMinutes: '30 minutes', settingsHint: 'The interval is saved in this browser.', saveFailed: 'Could not save this setting in this browser.',
         resetAt: '{time} Reset',
         resetShort: '{time} Reset',
         resetUnknown: 'Reset time unavailable',
@@ -49,7 +49,7 @@ window.__ModuleLoader__.load({
         weeklyShort: '每周',
         used: '剩余 {percent}%',
         usedShort: '剩余 {percent}%',
-        settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存刷新周期。',
+        settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', sidebarDisplay: '侧栏总开关', sidebarDisplayHint: '在侧栏显示 Codex 用量卡片。', fiveHourDisplay: '5 小时限额', fiveHourDisplayHint: '在侧栏显示 5 小时限额。', weeklyDisplay: '每周限额', weeklyDisplayHint: '在侧栏显示每周限额。', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存设置。',
         resetAt: '{time} 重置',
         resetShort: '{time} 重置',
         resetUnknown: '重置时间不可用',
@@ -142,12 +142,26 @@ window.__ModuleLoader__.load({
     }
 
     const intervalKey = 'dsh-codex-usage.refresh-interval';
+    const displaySettingsKey = 'dsh-codex-usage.display-settings';
+    const defaultDisplaySettings = { enabled: true, showFiveHour: true, showWeekly: true };
     const intervals = [60000, 300000, 900000, 1800000];
     const readInterval = () => {
       try { const value = Number(window.localStorage.getItem(intervalKey)); return intervals.includes(value) ? value : 60000; }
       catch { return 60000; }
     };
+    function readDisplaySettings() {
+      try {
+        const value = JSON.parse(window.localStorage.getItem(displaySettingsKey));
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return { ...defaultDisplaySettings };
+        return {
+          enabled: typeof value.enabled === 'boolean' ? value.enabled : true,
+          showFiveHour: typeof value.showFiveHour === 'boolean' ? value.showFiveHour : true,
+          showWeekly: typeof value.showWeekly === 'boolean' ? value.showWeekly : true,
+        };
+      } catch { return { ...defaultDisplaySettings }; }
+    }
     const signalChange = () => window.dispatchEvent(new Event('dsh-codex-usage-change'));
+    const signalPreferenceChange = () => window.dispatchEvent(new Event('dsh-codex-usage-preferences-change'));
 
     function AppServerCard({ wide, t, settings = false }) {
       const [snapshot, setSnapshot] = React.useState(null);
@@ -155,13 +169,20 @@ window.__ModuleLoader__.load({
       const [login, setLogin] = React.useState({ phase: 'idle' });
       const [callbackUrl, setCallbackUrl] = React.useState('');
       const [interval, setIntervalMs] = React.useState(readInterval);
+      const [displaySettings, setDisplaySettings] = React.useState(readDisplaySettings);
       const [intervalOpen, setIntervalOpen] = React.useState(false);
       const [saveError, setSaveError] = React.useState(false);
+      const [displaySaveError, setDisplaySaveError] = React.useState(false);
       const changeInterval = (event) => {
         const value = Number(event.target.value);
         if (!intervals.includes(value)) return;
-        try { window.localStorage.setItem(intervalKey, String(value)); setIntervalMs(value); setSaveError(false); signalChange(); }
+        try { window.localStorage.setItem(intervalKey, String(value)); setIntervalMs(value); setSaveError(false); signalPreferenceChange(); }
         catch { setSaveError(true); }
+      };
+      const changeDisplaySetting = (key, enabled) => {
+        const next = { ...displaySettings, [key]: Boolean(enabled) };
+        try { window.localStorage.setItem(displaySettingsKey, JSON.stringify(next)); setDisplaySettings(next); setDisplaySaveError(false); signalPreferenceChange(); }
+        catch { setDisplaySaveError(true); }
       };
       const loginWindow = React.useRef(null);
       const initialAuthRequest = React.useRef(null);
@@ -213,20 +234,34 @@ window.__ModuleLoader__.load({
       }, [load]);
 
       React.useEffect(() => {
+        const sync = () => {
+          setIntervalMs(readInterval());
+          const next = readDisplaySettings();
+          setDisplaySettings((current) => current.enabled === next.enabled && current.showFiveHour === next.showFiveHour && current.showWeekly === next.showWeekly ? current : next);
+        };
+        window.addEventListener('dsh-codex-usage-preferences-change', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+          window.removeEventListener('dsh-codex-usage-preferences-change', sync);
+          window.removeEventListener('storage', sync);
+        };
+      }, []);
+
+      const shouldFetch = settings || displaySettings.enabled;
+      React.useEffect(() => {
+        if (!shouldFetch) return;
         void refresh(false);
         if (settings) return () => { activeRequest.current?.abort(); activeRequest.current = null; };
-        const sync = () => { setIntervalMs(readInterval()); void refresh(false); };
-        window.addEventListener('dsh-codex-usage-change', sync);
-        window.addEventListener('storage', sync);
+        const refreshOnChange = () => { void refresh(false); };
+        window.addEventListener('dsh-codex-usage-change', refreshOnChange);
         const timer = setInterval(() => { void refresh(true); }, interval);
         return () => {
           clearInterval(timer);
-          window.removeEventListener('dsh-codex-usage-change', sync);
-          window.removeEventListener('storage', sync);
+          window.removeEventListener('dsh-codex-usage-change', refreshOnChange);
           activeRequest.current?.abort();
           activeRequest.current = null;
         };
-      }, [refresh, interval, settings]);
+      }, [refresh, interval, settings, shouldFetch]);
 
       const authAction = React.useCallback(async (action, input) => {
         initialAuthRequest.current?.abort();
@@ -285,6 +320,13 @@ window.__ModuleLoader__.load({
         ? null
         : t(status === 'loading' ? 'loading' : (statusKeys[status] ?? 'statusUnavailable'));
 
+      const displaySettingRow = (key, labelKey, hintKey, id) => h('div', { className: 'dcu-settings-row' },
+        h('div', { className: 'dcu-settings-copy' },
+          h('label', { className: 'dcu-settings-label', id: `${id}-label`, htmlFor: id }, t(labelKey)),
+          h('p', { className: 'dcu-settings-description' }, t(hintKey)),
+          displaySaveError && key === 'enabled' ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
+        h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: displaySettings[key], 'aria-checked': displaySettings[key], 'aria-labelledby': `${id}-label`, onChange: (event) => changeDisplaySetting(key, event.target.checked) }));
+
       if (settings) return h('div', { className: 'dcu-settings' },
         h('style', null, `
           .dcu-settings { width: 100%; color: var(--dsw-alias-label-primary, inherit); font: inherit; }
@@ -301,6 +343,12 @@ window.__ModuleLoader__.load({
           .dcu-settings .dcu-settings-button, .dcu-settings .dcu-settings-select { border: 0; border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-label-primary, currentColor) 4%, var(--dsw-alias-bg-base, white)); padding: 10px 14px; font-size: 14px; line-height: 1.4; }
           .dcu-settings-button { cursor: pointer; }
           .dcu-settings-button:disabled { opacity: .5; cursor: default; }
+          .dcu-settings-switch { appearance: none; position: relative; width: 42px; height: 24px; margin: 0; padding: 0; border: 1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35)); border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-label-primary, currentColor) 12%, var(--dsw-alias-bg-base, white)); cursor: pointer; transition: background-color 140ms ease, border-color 140ms ease; }
+          .dcu-settings-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--dsw-alias-bg-base, white); box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform 140ms ease; }
+          .dcu-settings-switch:checked { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-brand-primary); }
+          .dcu-settings-switch:checked::after { transform: translateX(18px); }
+          .dcu-settings-switch:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+          @media (prefers-reduced-motion: reduce) { .dcu-settings-switch, .dcu-settings-switch::after { transition: none; } }
           .dcu-settings-select { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; }
           .dcu-settings-chevron { display: block; flex: 0 0 16px; width: 16px; height: 16px; }
           .dcu-settings-dropdown { position: relative; }
@@ -336,6 +384,9 @@ window.__ModuleLoader__.load({
             h('form', { className: 'dcu-settings-form', onSubmit: (event) => { event.preventDefault(); void authAction('submit', callbackUrl); setCallbackUrl(''); } },
               h('input', { value: callbackUrl, onChange: (event) => setCallbackUrl(event.target.value), 'aria-label': t('manualPrompt'), autoComplete: 'off' }),
               h('button', { className: 'dcu-settings-button', type: 'submit', disabled: !callbackUrl.trim() }, t('submitCallback'))))) : null,
+        displaySettingRow('enabled', 'sidebarDisplay', 'sidebarDisplayHint', 'dcu-sidebar-enabled'),
+        displaySettingRow('showFiveHour', 'fiveHourDisplay', 'fiveHourDisplayHint', 'dcu-show-five-hour'),
+        displaySettingRow('showWeekly', 'weeklyDisplay', 'weeklyDisplayHint', 'dcu-show-weekly'),
         h('div', { className: 'dcu-settings-row' },
           h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label', id: 'dcu-refresh-label' }, t('refreshPeriod')),
@@ -353,6 +404,10 @@ window.__ModuleLoader__.load({
             h('p', { className: 'dcu-settings-description' }, t('refreshHint'))),
           h('button', { className: 'dcu-settings-button dcu-settings-control', type: 'button', disabled: refreshing, onClick: () => { void refresh(true).then(signalChange); } }, t('refresh'))),
       );
+
+      if (!displaySettings.enabled) return null;
+      // Treat a recognized weekly window without a 5-hour window as a plan with no 5-hour limit.
+      const hideFiveHour = !snapshot?.windows.fiveHour && Boolean(snapshot?.windows.weekly);
 
       return h('div', {
         className: `dcu-card${wide ? ' dcu-wide' : ''}`,
@@ -485,14 +540,14 @@ window.__ModuleLoader__.load({
         ),
         statusMessage ? h('p', { className: 'dcu-notice', role: 'status', 'aria-live': 'polite' }, statusMessage) : null,
         h('div', { className: 'dcu-limits' },
-          h(LimitRow, {
+          displaySettings.showFiveHour && !hideFiveHour ? h(LimitRow, {
             label: 'fiveHour', shortLabel: 'fiveHourShort',
             window: snapshot?.windows.fiveHour ?? null, wide, t, locale,
-          }),
-          h(LimitRow, {
+          }) : null,
+          displaySettings.showWeekly ? h(LimitRow, {
             label: 'weekly', shortLabel: 'weeklyShort',
             window: snapshot?.windows.weekly ?? null, wide, t, locale,
-          }),
+          }) : null,
         ),
       );
     }

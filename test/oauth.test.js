@@ -54,6 +54,14 @@ test('usage request sends credentials only upstream and returns sanitized result
   assert.equal(JSON.stringify(result).includes('secret'), false);
 });
 
+test('successful weekly-only usage keeps a valid weekly window and a missing 5-hour window', async () => {
+  const reader = createWhamReader({ resolve: async () => ({ auth: { apiKey: 'secret', headers: { 'chatgpt-account-id': 'account' } } }) }, {
+    fetchImpl: async () => Response.json({ rate_limit: { primary_window: { used_percent: 31, limit_window_seconds: 604800, reset_at: 200 }, secondary_window: null } }),
+  });
+  const result = await reader({ signal: new AbortController().signal });
+  assert.deepEqual(result, { status: 'ok', windows: { fiveHour: null, weekly: { usedPercent: 31, resetsAt: '1970-01-01T00:03:20.000Z' } } });
+});
+
 test('browser sign-in accepts a manual callback and never exposes credentials', async () => {
   let received;
   const auth = await createCodexAuth(fakeCredentials(), async () => ({
