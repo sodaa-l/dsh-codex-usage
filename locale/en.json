@@ -18,15 +18,9 @@
     "loading": "Loading usage…",
     "refresh": "Refresh Codex usage",
     "updated": "Updated {time}",
-    "statusMissingCli": "Codex CLI was not found. Set its executable path in the bundle config.",
-    "statusCliWrapperUnsupported": "The resolved CLI is a .cmd/.bat wrapper. Configure a native codex.exe path.",
     "statusNotAuthenticated": "Sign in to Codex with your ChatGPT account to read plan limits.",
-    "statusUnsupportedAuth": "API key sign-in does not provide ChatGPT plan limits.",
-    "statusTimeout": "Codex App Server did not respond in time.",
-    "statusProtocolError": "Codex App Server returned an unexpected response.",
-    "statusAccountUnavailable": "Codex account status could not be read.",
+    "statusTimeout": "Codex usage request timed out.",
     "statusRateLimitsUnavailable": "Codex usage limits are not available right now.",
-    "statusCliError": "Codex App Server could not be started.",
     "statusUnavailable": "Codex usage could not be loaded."
   }
 }

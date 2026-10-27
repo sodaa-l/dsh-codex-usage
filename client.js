@@ -6,20 +6,12 @@ window.__ModuleLoader__.load({
     const namespace = 'dsh-codex-usage';
     const apiPath = '/api/dsh-codex-usage';
     const statuses = [
-      'ok', 'missing-cli', 'cli-wrapper-unsupported', 'not-authenticated', 'unsupported-auth', 'timeout',
-      'protocol-error', 'account-unavailable', 'rate-limits-unavailable',
-      'cli-error', 'unavailable',
+      'ok', 'not-authenticated', 'timeout', 'rate-limits-unavailable', 'unavailable',
     ];
     const statusKeys = {
-      'missing-cli': 'statusMissingCli',
-      'cli-wrapper-unsupported': 'statusCliWrapperUnsupported',
       'not-authenticated': 'statusNotAuthenticated',
-      'unsupported-auth': 'statusUnsupportedAuth',
       timeout: 'statusTimeout',
-      'protocol-error': 'statusProtocolError',
-      'account-unavailable': 'statusAccountUnavailable',
       'rate-limits-unavailable': 'statusRateLimitsUnavailable',
-      'cli-error': 'statusCliError',
       unavailable: 'statusUnavailable',
     };
     const dictionaries = {
@@ -41,15 +33,9 @@ window.__ModuleLoader__.load({
         unavailable: 'Usage unavailable',
         loading: 'Loading usage…',
         refresh: 'Refresh Codex usage',
-        statusMissingCli: 'Codex CLI was not found. Set its executable path in the bundle config.',
-        statusCliWrapperUnsupported: 'The resolved CLI is a .cmd/.bat wrapper. Configure a native codex.exe path.',
         statusNotAuthenticated: 'Sign in to Codex with your ChatGPT account to read plan limits.',
-        statusUnsupportedAuth: 'API key sign-in does not provide ChatGPT plan limits.',
-        statusTimeout: 'Codex App Server did not respond in time.',
-        statusProtocolError: 'Codex App Server returned an unexpected response.',
-        statusAccountUnavailable: 'Codex account status could not be read.',
+        statusTimeout: 'Codex usage request timed out.',
         statusRateLimitsUnavailable: 'Codex usage limits are not available right now.',
-        statusCliError: 'Codex App Server could not be started.',
         statusUnavailable: 'Codex usage could not be loaded.',
       },
       zh: {
@@ -70,15 +56,9 @@ window.__ModuleLoader__.load({
         unavailable: '用量不可用',
         loading: '正在读取用量…',
         refresh: '刷新 Codex 用量',
-        statusMissingCli: '找不到 Codex CLI。请在 bundle 配置中设置可执行文件路径。',
-        statusCliWrapperUnsupported: '当前 CLI 是 .cmd/.bat 包装脚本。请配置原生 codex.exe 路径。',
         statusNotAuthenticated: '请使用 ChatGPT 账户登录 Codex，以读取套餐限额。',
-        statusUnsupportedAuth: 'API key 登录无法提供 ChatGPT 套餐限额。',
-        statusTimeout: 'Codex App Server 未能及时响应。',
-        statusProtocolError: 'Codex App Server 返回了无法识别的响应。',
-        statusAccountUnavailable: '无法读取 Codex 账户状态。',
+        statusTimeout: '读取 Codex 用量超时。',
         statusRateLimitsUnavailable: '目前无法读取 Codex 用量限额。',
-        statusCliError: '无法启动 Codex App Server。',
         statusUnavailable: '无法读取 Codex 用量。',
       },
     };
