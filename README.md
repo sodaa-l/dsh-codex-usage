@@ -45,4 +45,4 @@ npm test
 
 ## 许可与标志
 
-插件采用 MIT 许可，见 [LICENSE](LICENSE)。侧栏使用 OpenAI Blossom 矢量图形。OpenAI 和 Codex 名称及标志属于各自权利人。
+插件采用 MIT 许可，见 [LICENSE](LICENSE)。OpenAI 和 Codex 名称及标志属于各自权利人。
