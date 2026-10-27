@@ -57,7 +57,7 @@ npm ci
 npm test
 ```
 
-测试不需要 ChatGPT 账户。克隆源码或安装项目依赖不会自动把插件装入 DSH；插件安装和实际账户登录需要分别完成。侧栏卡片使用 `sidebar.footer.action` 插槽和 `:has()` 选择器占满一行，依赖当前 DSH 侧栏布局；如果插槽结构调整，可能需要更新样式。
+测试不需要 ChatGPT 账户。克隆源码或安装项目依赖不会自动把插件装入 DSH；插件安装和实际账户登录需要分别完成。本地安装验收时使用 `dsh-codex-usage@file:<项目目录>` 这种保留正式包名的规格，不要改用 `@local/dsh-codex-usage` alias；DSH 要求 Loader entry 名称与 `package.json.name` 一致。侧栏卡片使用 `sidebar.footer.action` 插槽和 `:has()` 选择器占满一行，依赖当前 DSH 侧栏布局；如果插槽结构调整，可能需要更新样式。
 
 ## 许可与标志
 

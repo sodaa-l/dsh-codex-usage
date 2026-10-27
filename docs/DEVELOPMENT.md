@@ -56,7 +56,9 @@ Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPerc
 
 ### Client 行为与 DSH 插槽
 
-- `package.json` 的 `dsh.client` 声明 Web 平台、立即加载，并注入 sidebar 与 locale Client 服务。
+- `package.json` 的 `dsh.client` 声明 Web 平台、立即加载，并注入 sidebar 与 locale Client 模块依赖。
+- DSH 的 ClientModuleRegistry 使用 bundle Loader entry 的 `name` 解析 Client 包，并要求最近的 `package.json.name` 与该名称相同，否则会跳过该 Client 模块。项目正式包名固定为 `dsh-codex-usage`；本地安装使用 `dsh-codex-usage@file:<本地目录>`，不要把包目录改写成 `@local/dsh-codex-usage`。`package.json.name`、`cordis.patch.yml` entry 的 `name`、`client.js` 注册的模块 `id` 必须一致；`exports['./client']` 还需指向 Client 入口。
+- `package.json.dsh.client.inject` 声明 Client 模块图依赖；`client.js` 返回对象中的 `inject` 则声明 Cordis Service 依赖，两者是不同层级。当前 Client 分别依赖 sidebar/locale 模块和 `slots`/`locale` Service。
 - Client 等待 `sidebar.footer.action` 和 `settings.section` 这两个实际子插槽出现后再注册。不要只等待父级 `sidebar` 或 `sidebar.settings`：父级可能先于子级声明。
 - 侧栏卡片注册顺序为 `-1000`，设置页为 `35`。卡片通过局部 CSS 适配整行宽度，并使用 DSH 字体和主题 token。
 - 卡片挂载时读取一次；侧栏挂载且总开关开启期间，按浏览器本地设置的间隔自动刷新。关闭总开关会隐藏卡片并停止侧栏轮询。设置页提供侧栏总开关及其 5 小时/每周窗口子开关；子开关缩进显示，并在总开关关闭时禁用且保留已保存的选择；设置页也提供手动刷新。可选刷新间隔为 1、5、15、30 分钟，默认 1 分钟；间隔和三个显示开关默认均开启，并保存在当前浏览器的 `localStorage`。
@@ -77,11 +79,15 @@ Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPerc
 3. 若改动 OAuth 或额度接口，使用可取消的 Host 请求验证未登录、错误、超时和退出登录路径；不要把令牌写入日志或测试快照。
 4. 若改动配置或 bundle 元数据，检查 `cordis.patch.yml`、`package.json` 和包文件清单彼此一致。
 
-### 插件图标元数据
+### 插件元数据与 Client 包身份
 
-[package.json](../package.json) 同时声明顶层 `"icon": "./icon.svg"` 和 `exports` 中的 `"./package.json": "./package.json"`，并保留 `./icon` 导出。DSH 通过导出的包清单读取顶层图标路径；只加 `icon` 而不导出清单仍会回退到 `./icon`。本地依赖别名 `@local/dsh-codex-usage` 与清单名 `dsh-codex-usage` 不同时，该回退分支会因包名归属校验报错，不能仅靠把 `link:` 改成 `file:` 修复。
+[package.json](../package.json) 声明顶层 `"icon": "./icon.svg"`、`exports` 中的 `"./package.json": "./package.json"`，并保留 `./icon` 导出。DSH 可通过导出的包清单读取顶层图标路径；缺少该导出或图标声明时才回退到 `./icon`。
 
-[package-metadata.test.js](../test/package-metadata.test.js) 以实际本地别名布局验证清单与图标可解析。安装验收还应在新进程中调用本机 DSH 的真实 `readPluginMeta('@local/dsh-codex-usage', parentURL)`，确认没有 `error` 且 `icon` 是与原图字节一致的 SVG data URI；同时检查实际发布包和已安装包，不能用 `active` 或安装成功代替元数据验收。若旧进程仍保留包导出解析缓存，应完整重启 DSH 后复核界面。
+ClientModuleRegistry 使用 `cordis.patch.yml` 中的 Loader entry 名称定位包，并要求包清单的 `name` 与它一致。本插件的 canonical 身份固定为 `dsh-codex-usage`；保持 manifest name、Loader entry name 与 Client factory id 相同，避免 Client 模块被跳过，导致侧栏和设置页都不注册。`dsh.client.inject` 声明模块图依赖；插件返回对象中的 `inject` 声明 Cordis Service 依赖。
+
+ClientModuleRegistry 按 `baseURL + loaderName` 缓存包元数据，也缓存 `null` 解析失败结果。如果 canonical key 已经发生过 miss，在运行中的 Host 里重装同名包仍可能命中负缓存；完整重启 Host 会清除此缓存。从旧 alias 切换到此前未查询过的 `dsh-codex-usage` key 时，可在当前 Host 验证解析与插槽注册。
+
+[package-metadata.test.js](../test/package-metadata.test.js) 在临时 profile 的 `node_modules/dsh-codex-usage` canonical 布局中验证包导出可解析、Loader entry 与 Client factory 身份一致、顶层图标及 `./icon` 导出指向同一文件且字节一致。安装验收应检查 Client 模块进入运行时图，并用真实 Client Slots inspect 检查目标插槽与注册项；不能以 `active`、安装成功或 Host 图标可见代替。图标应通过本机 DSH 的真实 `readPluginMeta('dsh-codex-usage', parentURL)` 验证 `error` 缺失且 SVG data URI 字节一致。若 canonical key 已被负缓存，完整重启 DSH 后复核。
 
 ## 决策索引
 
