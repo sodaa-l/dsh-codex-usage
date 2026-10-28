@@ -50,6 +50,7 @@ test('resolves canonical Client package identity and manifest icon from an insta
   assert.equal(manifest.dsh.client.immediately, true);
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-sidebar'));
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-locale'));
+  assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-primitives'));
 
   const loadedModules = [];
   runInNewContext(await readFile(clientPath, 'utf8'), {
@@ -57,9 +58,13 @@ test('resolves canonical Client package identity and manifest icon from an insta
   }, { filename: clientPath });
   assert.equal(loadedModules.length, 1, 'client.js must register exactly one Client module');
   assert.equal(loadedModules[0].id, manifest.name);
+  const dependencies = new Map([
+    ['react', { createElement() {} }],
+    ['@deepseek-ai/dsh-client-ui-primitives', { Tooltip() {} }],
+  ]);
   const clientPlugin = loadedModules[0].factory((specifier) => {
-    assert.equal(specifier, 'react');
-    return { createElement() {} };
+    assert.ok(dependencies.has(specifier), `Unexpected Client dependency: ${specifier}`);
+    return dependencies.get(specifier);
   });
   assert.deepEqual(Array.from(clientPlugin.inject), ['slots', 'locale']);
 

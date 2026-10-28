@@ -91,11 +91,11 @@ test('footer handles weekly-only, unavailable, stale windows and corrupt prefere
   assert.equal(find(tree, (node) => node.props.role === 'progressbar').length, 2);
   assert.ok(find(tree, (node) => node.props.role === 'progressbar').every((node) => node.props['aria-valuenow'] === undefined));
   assert.deepEqual(find(tree, (node) => node.props.className === 'dcu-dock-percent').map((node) => node.children[0]), ['—', '—']);
-  assert.match(find(tree, (node) => node.type === 'button')[0].props.title, /statusUnavailable/);
+  assert.match(find(tree, (node) => node.type === 'button')[0].props['aria-label'], /statusUnavailable/);
   app.setSnapshot({ ...both, status: 'unavailable', stale: true });
   tree = app.render();
   assert.deepEqual(find(tree, (node) => node.props.role === 'progressbar').map((node) => node.props['aria-valuenow']), [76, 55]);
-  assert.doesNotMatch(find(tree, (node) => node.type === 'button')[0].props.title, /statusUnavailable/);
+  assert.doesNotMatch(find(tree, (node) => node.type === 'button')[0].props['aria-label'], /statusUnavailable/);
 });
 
 test('footer opens the complete shared card above its trigger and cleans up dismissal listeners', () => {

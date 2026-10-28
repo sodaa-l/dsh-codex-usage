@@ -56,13 +56,13 @@ Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPerc
 
 ### Client 行为与 DSH 插槽
 
-- `package.json` 的 `dsh.client` 声明 Web 平台、立即加载，并注入 sidebar、conversation 与 locale Client 模块依赖。
+- `package.json` 的 `dsh.client` 声明 Web 平台、立即加载，并注入 sidebar、conversation、primitives 与 locale Client 模块依赖。
 - DSH 的 ClientModuleRegistry 使用 bundle Loader entry 的 `name` 解析 Client 包，并要求最近的 `package.json.name` 与该名称相同，否则会跳过该 Client 模块。项目正式包名固定为 `dsh-codex-usage`；本地安装使用 `dsh-codex-usage@file:<本地目录>`，不要把包目录改写成 `@local/dsh-codex-usage`。`package.json.name`、`cordis.patch.yml` entry 的 `name`、`client.js` 注册的模块 `id` 必须一致；`exports['./client']` 还需指向 Client 入口。
-- `package.json.dsh.client.inject` 声明 Client 模块图依赖；`client.js` 返回对象中的 `inject` 则声明 Cordis Service 依赖，两者是不同层级。当前 Client 分别依赖 sidebar/conversation/locale 模块和 `slots`/`locale` Service。
+- `package.json.dsh.client.inject` 声明 Client 模块图依赖；`client.js` 返回对象中的 `inject` 则声明 Cordis Service 依赖，两者是不同层级。当前 Client 分别依赖 sidebar/conversation/primitives/locale 模块和 `slots`/`locale` Service。
 - Client 分别等待 `sidebar.footer.action`、`conversation.composer.dock` 和 `settings.section` 这三个实际子插槽出现后再注册。不要只等待父级 `sidebar` 或 `sidebar.settings`：父级可能先于子级声明。
 - 侧栏卡片注册顺序为 `-1000`，设置页为 `35`。卡片通过局部 CSS 适配整行宽度，并使用 DSH 字体和主题 token。
 - 侧栏、底栏和设置页通过同一个 Client store 订阅用量快照与刷新状态。首个可见入口挂载时读取一次；至少一个侧栏/底栏入口可见时只运行一个自动刷新定时器。迟挂载的底栏及其他会话立即复用当前快照，不创建独立请求或刷新周期。设置页的手动刷新也直接更新同一份快照。可选间隔为 1、5、15、30 分钟，默认 1 分钟；间隔和显示开关保存在浏览器 `localStorage`。
-- 底栏控件注册于 `conversation.composer.dock`，顺序为 `1000`。局部 CSS 只维持其在其他控件之后的排序，并允许窄窗口换行，不撑满底栏或使用自动边距推到屏幕右端；文字使用与上下文控件相同的 `--dsw-alias-label-tertiary`，进度条沿用卡片的 `--dsw-alias-state-business-primary`，尺寸为 36×8px。每条进度条后显示剩余额度 `X%`，底栏及其悬浮提示不显示重置时间；重置时间保留在完整卡片中。
+- 底栏控件注册于 `conversation.composer.dock`，顺序为 `1000`。局部 CSS 只维持其在其他控件之后的排序，并允许窄窗口换行，不撑满底栏或使用自动边距推到屏幕右端；文字使用与上下文控件相同的 `--dsw-alias-label-tertiary`，进度条沿用卡片的 `--dsw-alias-state-business-primary`，尺寸为 36×7px。每条进度条后显示剩余额度 `X%`，底栏及其悬浮提示不显示重置时间；重置时间保留在完整卡片中。
 - 底栏总开关及其缩进子开关单独保存在 `dsh-codex-usage.dock-settings` 的 `enabled` / `showFiveHour` / `showWeekly`，默认均开启；旧设置缺少 `enabled` 时按开启处理。侧栏总开关及其缩进子开关独立保存在 `dsh-codex-usage.display-settings`，均默认开启；两个入口各自的总开关关闭时禁用子开关并保留选择。隐藏某个入口只释放自己的刷新需求；最后一个自动刷新入口隐藏后停止周期轮询，最后一个用量入口（含设置页）卸载后中止请求并清理所有计时器。弹层直接展示共享快照，不创建独立订阅或请求。
 - 共享调度器按 5 小时和每周窗口的 `resetsAt` 安排额外定时器，到期使用 `?refresh=1` 跳过 Host 缓存；两个窗口同时到期合并查询，恰好在重置时发出的定时强刷也满足重置刷新。若旧请求仍在进行，则结束后补发一次强刷。每个窗口的同一重置时间只触发一次，避免上游仍返回旧时间或失败保留旧窗口时循环请求；后续新重置时间重新调度。
 - 底栏点击展开完整卡片，复用 `renderCard` 和 `LimitRow`，始终展示套餐支持的窗口。原生 `popover="manual"` 使面板进入顶层而仍位于自身插槽 DOM；按自有触发器测量定位到上方，监听窗口滚动/缩放和自身尺寸变化。再次点击、外部点击、焦点离开或 Esc 收起；关闭/卸载清理监听器和观察器，Esc 恢复触发器焦点。
@@ -92,6 +92,12 @@ ClientModuleRegistry 使用 `cordis.patch.yml` 中的 Loader entry 名称定位�
 ClientModuleRegistry 按 `baseURL + loaderName` 缓存包元数据，也缓存 `null` 解析失败结果。如果 canonical key 已经发生过 miss，在运行中的 Host 里重装同名包仍可能命中负缓存；完整重启 Host 会清除此缓存。从旧 alias 切换到此前未查询过的 `dsh-codex-usage` key 时，可在当前 Host 验证解析与插槽注册。
 
 [package-metadata.test.js](../test/package-metadata.test.js) 在临时 profile 的 `node_modules/dsh-codex-usage` canonical 布局中验证包导出可解析、Loader entry 与 Client factory 身份一致、顶层图标及 `./icon` 导出指向同一文件且字节一致。安装验收应检查 Client 模块进入运行时图，并用真实 Client Slots inspect 检查目标插槽与注册项；不能以 `active`、安装成功或 Host 图标可见代替。图标应通过本机 DSH 的真实 `readPluginMeta('dsh-codex-usage', parentURL)` 验证 `error` 缺失且 SVG data URI 字节一致。若 canonical key 已被负缓存，完整重启 DSH 后复核。
+
+## npm 发布
+
+发布 GitHub release 时，`.github/workflows/publish.yml` 使用该 tag 对应的源码，运行 `npm ci` 和 `npm test`，确认 release tag 与 `package.json` 版本一致后执行 `npm publish`。工作流用 npm Trusted Publishing 的 OIDC 认证，不保存长期 npm token。
+
+在 npmjs.com 的 `dsh-codex-usage` 包设置中添加 GitHub Actions Trusted Publisher：owner/user 为 `sodaa-l`、repository 为 `dsh-codex-usage`、workflow filename 为 `publish.yml`；本工作流不使用 GitHub environment，可留空。允许直接执行 `npm publish`。工作流授予 `id-token: write`，使用 Node 24 与 npm 11.15 或更高版本；Trusted Publishing 会自动生成 provenance。
 
 ## 决策索引
 
