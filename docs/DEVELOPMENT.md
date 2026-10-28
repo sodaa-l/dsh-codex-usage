@@ -95,7 +95,7 @@ ClientModuleRegistry 按 `baseURL + loaderName` 缓存包元数据，也缓存 `
 
 ## npm 发布
 
-发布 GitHub release 时，`.github/workflows/publish.yml` 使用该 tag 对应的源码，运行 `npm ci` 和 `npm test`，确认 release tag 与 `package.json` 版本一致后执行 `npm publish`。工作流用 npm Trusted Publishing 的 OIDC 认证，不保存长期 npm token。
+发布 GitHub release 时，`.github/workflows/publish.yml` 使用该 tag 对应的源码，运行 `npm ci` 和 `npm test`，确认 release tag 与 `package.json` 版本一致后执行 `npm publish`。工作流用 npm Trusted Publishing 的 OIDC 认证，不保存长期 npm token。发布失败后可在 Actions 手动运行此 workflow，从 `main` checkout 并传入已发布的 release tag；工作流会校验 tag 与包版本一致、release 已发布。手动重试只适用于 `main` 与该 release 的代码相同的修复。工作流会确保发布包的 `repository.url` 与 GitHub 仓库地址一致，以通过 npm provenance 校验。
 
 在 npmjs.com 的 `dsh-codex-usage` 包设置中添加 GitHub Actions Trusted Publisher：owner/user 为 `sodaa-l`、repository 为 `dsh-codex-usage`、workflow filename 为 `publish.yml`；本工作流不使用 GitHub environment，可留空。允许直接执行 `npm publish`。工作流授予 `id-token: write`，使用 Node 24 与 npm 11.15 或更高版本；Trusted Publishing 会自动生成 provenance。
 

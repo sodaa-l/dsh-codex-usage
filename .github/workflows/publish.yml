@@ -3,6 +3,12 @@ name: Publish npm package
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published release tag to retry
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,9 +26,19 @@ jobs:
       - name: Ensure npm supports trusted publishing
         run: npm install --global 'npm@^11.15.0'
       - name: Verify release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           version="$(npm pkg get version | tr -d '"')"
-          test "$GITHUB_REF_NAME" = "v$version"
+          test "$RELEASE_TAG" = "v$version"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_REF_NAME" = "main"
+            is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')"
+            test "$is_draft" = "false"
+          fi
       - run: npm ci
       - run: npm test
+      - name: Set repository metadata required for provenance
+        run: npm pkg set repository.type=git repository.url=https://github.com/sodaa-l/dsh-codex-usage
       - run: npm publish
