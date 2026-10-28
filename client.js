@@ -395,7 +395,7 @@ window.__ModuleLoader__.load({
           .dcu-dock-trigger:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
           .dcu-dock .dcu-logo { display: block; width: 16px; height: 16px; flex: 0 0 16px; }
           .dcu-dock-limit { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-          .dcu-dock-track { display: block; flex: 0 0 36px; width: 36px; height: 8px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 17%, transparent); }
+          .dcu-dock-track { display: block; flex: 0 0 36px; width: 36px; height: 7px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 17%, transparent); }
           .dcu-dock-fill { display: block; height: 100%; border-radius: inherit; background: var(--dsw-alias-state-business-primary); transition: width 180ms ease-out; }
           .dcu-popover { position: fixed; inset: auto; box-sizing: border-box; width: min(280px, calc(100vw - 16px)); margin: 0; padding: 0; border: 0; border-radius: var(--dsw-radius-lg, 12px); background: var(--dsw-specific-menu, var(--dsw-alias-bg-overlay, white)); color: var(--dsw-alias-label-secondary, inherit); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.18)); backdrop-filter: var(--dsw-menu-backdrop-filter); overflow: auto; z-index: 1100; }
           .dcu-popover .dcu-card { padding: 13px 12px 11px; }
