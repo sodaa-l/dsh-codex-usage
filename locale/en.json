@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Codex Usage",
-    "description": "Shows Codex five-hour and weekly usage limits in the sidebar."
+    "description": "Shows Codex five-hour and weekly usage limits in the sidebar and footer."
   },
   "codexUsage": {
     "title": "Codex usage",

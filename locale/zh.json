@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Codex 额度显示",
-    "description": "在侧栏显示 Codex 的 5 小时与每周用量限额。"
+    "description": "在侧栏与底栏显示 Codex 的 5 小时与每周用量限额。"
   },
   "codexUsage": {
     "title": "Codex 用量",

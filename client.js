@@ -25,6 +25,7 @@ window.__ModuleLoader__.load({
         weekly: 'Weekly limit',
         fiveHourShort: '5h',
         weeklyShort: 'Week',
+        dockFiveHourShort: '5h', dockWeeklyShort: '1w', dockDisplay: 'Footer display', dockDisplayHint: 'Show limits at the right of the footer. Turn off both to hide the control.', dockFiveHourDisplayHint: 'Show the 5-hour limit in the footer.', dockWeeklyDisplayHint: 'Show the weekly limit in the footer.',
         used: 'Remaining {percent}%',
         usedShort: '{percent}% left',
         settingsTitle: 'Codex usage', account: 'Account', accountHint: 'Connect your ChatGPT account to view Codex limits.', sidebarDisplay: 'Sidebar display', sidebarDisplayHint: 'Show the Codex usage card in the sidebar.', fiveHourDisplay: '5-hour limit', fiveHourDisplayHint: 'Show the 5-hour limit in the sidebar.', weeklyDisplay: 'Weekly limit', weeklyDisplayHint: 'Show the weekly limit in the sidebar.', refreshTitle: 'Refresh usage', refreshHint: 'Update the displayed limits now.', refreshPeriod: 'Refresh interval', everyMinute: '1 minute', everyFiveMinutes: '5 minutes', everyFifteenMinutes: '15 minutes', everyThirtyMinutes: '30 minutes', settingsHint: 'The interval is saved in this browser.', saveFailed: 'Could not save this setting in this browser.',
@@ -49,6 +50,7 @@ window.__ModuleLoader__.load({
         weekly: '每周限额',
         fiveHourShort: '5小时',
         weeklyShort: '每周',
+        dockFiveHourShort: '5h', dockWeeklyShort: '1 周', dockDisplay: '底栏显示', dockDisplayHint: '在底栏右端显示额度，关闭两项即可隐藏控件。', dockFiveHourDisplayHint: '在底栏显示 5 小时限额。', dockWeeklyDisplayHint: '在底栏显示每周限额。',
         used: '剩余 {percent}%',
         usedShort: '剩余 {percent}%',
         settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', sidebarDisplay: '侧栏总开关', sidebarDisplayHint: '在侧栏显示 Codex 用量卡片。', fiveHourDisplay: '5 小时限额', fiveHourDisplayHint: '在侧栏显示 5 小时限额。', weeklyDisplay: '每周限额', weeklyDisplayHint: '在侧栏显示每周限额。', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存设置。',
@@ -162,10 +164,116 @@ window.__ModuleLoader__.load({
         };
       } catch { return { ...defaultDisplaySettings }; }
     }
+    const dockSettingsKey = 'dsh-codex-usage.dock-settings';
+    const defaultDockSettings = { showFiveHour: true, showWeekly: true };
+    function readDockSettings() {
+      try {
+        const value = JSON.parse(window.localStorage.getItem(dockSettingsKey));
+        return {
+          showFiveHour: typeof value?.showFiveHour === 'boolean' ? value.showFiveHour : true,
+          showWeekly: typeof value?.showWeekly === 'boolean' ? value.showWeekly : true,
+        };
+      } catch { return { ...defaultDockSettings }; }
+    }
     const signalChange = () => window.dispatchEvent(new Event('dsh-codex-usage-change'));
     const signalPreferenceChange = () => window.dispatchEvent(new Event('dsh-codex-usage-preferences-change'));
 
-    function AppServerCard({ wide, t, settings = false }) {
+    function DockUsage({ snapshot, preferences, t, locale, statusMessage, card }) {
+      const [open, setOpen] = React.useState(false);
+      const [position, setPosition] = React.useState(undefined);
+      const rootRef = React.useRef(null);
+      const triggerRef = React.useRef(null);
+      const panelRef = React.useRef(null);
+      const panelId = React.useId();
+      const hideFiveHour = !snapshot?.windows.fiveHour && Boolean(snapshot?.windows.weekly);
+      const limits = [
+        ...(preferences.showFiveHour && !hideFiveHour ? [{ key: 'fiveHour', label: 'dockFiveHourShort' }] : []),
+        ...(preferences.showWeekly ? [{ key: 'weekly', label: 'dockWeeklyShort' }] : []),
+      ];
+      const available = limits.length > 0;
+
+      React.useEffect(() => {
+        if (!open || !available) return;
+        const panel = panelRef.current;
+        const trigger = triggerRef.current;
+        // Native top-layer rendering escapes composer clipping without moving DOM outside our slot.
+        panel.showPopover?.();
+        const place = () => {
+          const rect = trigger.getBoundingClientRect();
+          const width = panel.getBoundingClientRect().width;
+          setPosition({
+            left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+            bottom: Math.max(8, window.innerHeight - rect.top + 8),
+            maxHeight: Math.max(0, rect.top - 16),
+          });
+        };
+        const dismiss = (event) => {
+          if (!rootRef.current?.contains(event.target)) setOpen(false);
+        };
+        const escape = (event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+          trigger.focus({ preventScroll: true });
+        };
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(place) : null;
+        observer?.observe(trigger);
+        observer?.observe(panel);
+        place();
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        document.addEventListener('pointerdown', dismiss);
+        document.addEventListener('keydown', escape, true);
+        return () => {
+          observer?.disconnect();
+          window.removeEventListener('resize', place);
+          window.removeEventListener('scroll', place, true);
+          document.removeEventListener('pointerdown', dismiss);
+          document.removeEventListener('keydown', escape, true);
+          if (panel.isConnected) panel.hidePopover?.();
+        };
+      }, [open, available]);
+
+      if (!available) return null;
+      const readings = limits.map(({ key, label }) => {
+        const limit = snapshot?.windows[key];
+        const reset = resetTime(limit?.resetsAt, locale, key === 'weekly');
+        return { key, label, percent: limit ? 100 - limit.usedPercent : undefined, reset };
+      });
+      const description = [t('title'), statusMessage, ...readings.map(({ label, percent, reset }) =>
+        `${t(label)} ${percent === undefined ? t('unavailable') : t('used', { percent })} ${reset ? t('resetAt', { time: reset }) : t('resetUnknown')}`)].filter(Boolean).join(' · ');
+      return h('span', { ref: rootRef, className: 'dcu-dock', onBlur: (event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); } },
+        h('style', null, `
+          [data-composer-dock]:has(.dcu-dock) { width: 100%; max-width: var(--dsh-composer-card-max-width, 100%); flex-wrap: wrap; }
+          .dcu-dock, [data-composer-dock] > :has(> .dcu-dock) { order: 1000; margin-inline-start: auto; }
+          .dcu-dock { display: inline-flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+          .dcu-dock-trigger { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; max-width: 100%; padding: 1px 8px; border: 0; border-radius: var(--dsw-radius-sm, 5px); background: transparent; color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary, inherit)); font: inherit; font-size: var(--dsh-content-font-size-secondary, 13px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); font-variant-numeric: tabular-nums; cursor: pointer; }
+          .dcu-dock-trigger:hover, .dcu-dock-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary, inherit); }
+          .dcu-dock-trigger:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+          .dcu-dock .dcu-logo { display: block; width: 16px; height: 16px; flex: 0 0 16px; }
+          .dcu-dock-limit { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+          .dcu-dock-track { display: block; flex: 0 0 36px; width: 36px; height: 8px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 17%, transparent); }
+          .dcu-dock-fill { display: block; height: 100%; border-radius: inherit; background: var(--dsw-alias-state-business-primary); transition: width 180ms ease-out; }
+          .dcu-popover { position: fixed; inset: auto; box-sizing: border-box; width: min(280px, calc(100vw - 16px)); margin: 0; padding: 0; border: 0; border-radius: var(--dsw-radius-lg, 12px); background: var(--dsw-specific-menu, var(--dsw-alias-bg-overlay, white)); color: var(--dsw-alias-label-secondary, inherit); --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.18)); backdrop-filter: var(--dsw-menu-backdrop-filter); overflow: auto; z-index: 1100; }
+          .dcu-popover .dcu-card { padding: 13px 12px 11px; }
+          @media (prefers-reduced-motion: reduce) { .dcu-dock-fill { transition: none; } }
+        `),
+        h('button', { ref: triggerRef, className: 'dcu-dock-trigger', type: 'button', 'aria-label': description, title: description, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-controls': open ? panelId : undefined, onClick: () => { setPosition(undefined); setOpen(!open); } },
+          h(Logo),
+          ...readings.flatMap(({ key, label, percent, reset }, index) => [
+            index ? h('span', { key: `${key}-separator`, 'aria-hidden': true }, '・') : null,
+            h('span', { key, className: 'dcu-dock-limit' },
+              h('span', null, t(label)),
+              h('span', { className: 'dcu-dock-track', role: 'progressbar', 'aria-label': t(key), 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': percent, 'aria-valuetext': percent === undefined ? t('unavailable') : t('used', { percent }) },
+                h('span', { className: 'dcu-dock-fill', style: { width: `${percent ?? 0}%` } })),
+              h('span', null, reset ?? '—')),
+          ])),
+        open ? h('div', { ref: panelRef, id: panelId, className: 'dcu-popover', popover: 'manual', tabIndex: -1, role: 'dialog', 'aria-label': t('title'), style: position ?? { visibility: 'hidden' } }, card) : null,
+      );
+    }
+
+    function AppServerCard({ wide, t, settings = false, dock = false }) {
       const [snapshot, setSnapshot] = React.useState(null);
       const [refreshing, setRefreshing] = React.useState(false);
       const [login, setLogin] = React.useState({ phase: 'loading' });
@@ -175,6 +283,13 @@ window.__ModuleLoader__.load({
       const [intervalOpen, setIntervalOpen] = React.useState(false);
       const [saveError, setSaveError] = React.useState(false);
       const [displaySaveError, setDisplaySaveError] = React.useState(false);
+      const [dockSettings, setDockSettings] = React.useState(readDockSettings);
+      const [dockSaveError, setDockSaveError] = React.useState(false);
+      const changeDockSetting = (key, enabled) => {
+        const next = { ...dockSettings, [key]: Boolean(enabled) };
+        try { window.localStorage.setItem(dockSettingsKey, JSON.stringify(next)); setDockSettings(next); setDockSaveError(false); signalPreferenceChange(); }
+        catch { setDockSaveError(true); }
+      };
       const changeInterval = (event) => {
         const value = Number(event.target.value);
         if (!intervals.includes(value)) return;
@@ -241,6 +356,8 @@ window.__ModuleLoader__.load({
           setIntervalMs(readInterval());
           const next = readDisplaySettings();
           setDisplaySettings((current) => current.enabled === next.enabled && current.showFiveHour === next.showFiveHour && current.showWeekly === next.showWeekly ? current : next);
+          const nextDock = readDockSettings();
+          setDockSettings((current) => current.showFiveHour === nextDock.showFiveHour && current.showWeekly === nextDock.showWeekly ? current : nextDock);
         };
         window.addEventListener('dsh-codex-usage-preferences-change', sync);
         window.addEventListener('storage', sync);
@@ -250,7 +367,7 @@ window.__ModuleLoader__.load({
         };
       }, []);
 
-      const shouldFetch = settings || displaySettings.enabled;
+      const shouldFetch = settings || (dock ? dockSettings.showFiveHour || dockSettings.showWeekly : displaySettings.enabled);
       React.useEffect(() => {
         if (!shouldFetch) return;
         void refresh(false);
@@ -335,12 +452,15 @@ window.__ModuleLoader__.load({
         ? null
         : t(status === 'loading' ? 'loading' : (statusKeys[status] ?? 'statusUnavailable'));
 
-      const displaySettingRow = (key, labelKey, hintKey, id) => h('div', { className: 'dcu-settings-row' },
-        h('div', { className: 'dcu-settings-copy' },
-          h('label', { className: 'dcu-settings-label', id: `${id}-label`, htmlFor: id }, t(labelKey)),
-          h('p', { className: 'dcu-settings-description' }, t(hintKey)),
-          displaySaveError && key === 'enabled' ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
-        h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: displaySettings[key], 'aria-checked': displaySettings[key], 'aria-labelledby': `${id}-label`, 'aria-controls': key === 'enabled' ? 'dcu-settings-display-children' : undefined, disabled: key !== 'enabled' && !displaySettings.enabled, onChange: (event) => changeDisplaySetting(key, event.target.checked) }));
+      const displaySettingRow = (key, labelKey, hintKey, id, footer = false) => {
+        const preferences = footer ? dockSettings : displaySettings;
+        return h('div', { className: 'dcu-settings-row' },
+          h('div', { className: 'dcu-settings-copy' },
+            h('label', { className: 'dcu-settings-label', id: `${id}-label`, htmlFor: id }, t(labelKey)),
+            h('p', { className: 'dcu-settings-description' }, t(hintKey)),
+            (footer ? dockSaveError && key === 'showFiveHour' : displaySaveError && key === 'enabled') ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
+          h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: preferences[key], 'aria-checked': preferences[key], 'aria-labelledby': `${id}-label`, 'aria-controls': !footer && key === 'enabled' ? 'dcu-settings-display-children' : undefined, disabled: !footer && key !== 'enabled' && !displaySettings.enabled, onChange: (event) => (footer ? changeDockSetting : changeDisplaySetting)(key, event.target.checked) }));
+      };
 
       if (settings) return h('div', { className: 'dcu-settings' },
         h('style', null, `
@@ -412,6 +532,13 @@ window.__ModuleLoader__.load({
           displaySettingRow('showWeekly', 'weeklyDisplay', 'weeklyDisplayHint', 'dcu-show-weekly')),
         h('div', { className: 'dcu-settings-row' },
           h('div', { className: 'dcu-settings-copy' },
+            h('span', { className: 'dcu-settings-label', id: 'dcu-dock-display-label' }, t('dockDisplay')),
+            h('p', { className: 'dcu-settings-description' }, t('dockDisplayHint')))),
+        h('div', { className: 'dcu-settings-display-children', role: 'group', 'aria-labelledby': 'dcu-dock-display-label' },
+          displaySettingRow('showFiveHour', 'fiveHourDisplay', 'dockFiveHourDisplayHint', 'dcu-dock-show-five-hour', true),
+          displaySettingRow('showWeekly', 'weeklyDisplay', 'dockWeeklyDisplayHint', 'dcu-dock-show-weekly', true)),
+        h('div', { className: 'dcu-settings-row' },
+          h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label', id: 'dcu-refresh-label' }, t('refreshPeriod')),
             h('p', { className: 'dcu-settings-description' }, t('settingsHint')),
             saveError ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
@@ -428,12 +555,11 @@ window.__ModuleLoader__.load({
           h('button', { className: 'dcu-settings-button dcu-settings-control', type: 'button', disabled: refreshing, onClick: () => { void refresh(true).then(signalChange); } }, t('refresh'))),
       );
 
-      if (!displaySettings.enabled) return null;
       // Treat a recognized weekly window without a 5-hour window as a plan with no 5-hour limit.
       const hideFiveHour = !snapshot?.windows.fiveHour && Boolean(snapshot?.windows.weekly);
 
-      return h('div', {
-        className: `dcu-card${wide ? ' dcu-wide' : ''}`,
+      const renderCard = (cardSettings, popover = false) => h('div', {
+        className: `dcu-card${wide ? ' dcu-wide' : ''}${popover ? ' dcu-popover-card' : ''}`,
         role: 'group',
         'aria-label': t('title'),
       },
@@ -450,7 +576,7 @@ window.__ModuleLoader__.load({
             font-weight: 400;
             line-height: 1.4;
           }
-          div:has(> .dcu-card) {
+          div:has(> .dcu-card:not(.dcu-popover-card)) {
             box-sizing: border-box;
             display: flex;
             flex-wrap: wrap;
@@ -459,8 +585,8 @@ window.__ModuleLoader__.load({
             width: 100%;
             min-width: 0;
           }
-          div:has(> .dcu-card) > .dcu-card { flex: 0 0 100%; }
-          div:has(> :has(> .dcu-card)) {
+          div:has(> .dcu-card:not(.dcu-popover-card)) > .dcu-card { flex: 0 0 100%; }
+          div:has(> :has(> .dcu-card:not(.dcu-popover-card))) {
             display: flex;
             flex-wrap: wrap;
             align-items: flex-start;
@@ -563,16 +689,18 @@ window.__ModuleLoader__.load({
         ),
         statusMessage ? h('p', { className: 'dcu-notice', role: 'status', 'aria-live': 'polite' }, statusMessage) : null,
         h('div', { className: 'dcu-limits' },
-          displaySettings.showFiveHour && !hideFiveHour ? h(LimitRow, {
+          cardSettings.showFiveHour && !hideFiveHour ? h(LimitRow, {
             label: 'fiveHour', shortLabel: 'fiveHourShort',
             window: snapshot?.windows.fiveHour ?? null, wide, t, locale,
           }) : null,
-          displaySettings.showWeekly ? h(LimitRow, {
+          cardSettings.showWeekly ? h(LimitRow, {
             label: 'weekly', shortLabel: 'weeklyShort',
             window: snapshot?.windows.weekly ?? null, wide, t, locale,
           }) : null,
         ),
       );
+      if (dock) return shouldFetch ? h(DockUsage, { snapshot, preferences: dockSettings, t, locale, statusMessage, card: renderCard(defaultDisplaySettings, true) }) : null;
+      return displaySettings.enabled ? renderCard(displaySettings) : null;
     }
 
     return {
@@ -585,6 +713,13 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(namespace);
         const Card = (props) => h(AppServerCard, { ...props, t });
         const Settings = () => h(AppServerCard, { settings: true, wide: true, t });
+        const Dock = () => h(AppServerCard, { dock: true, wide: true, t });
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
+          id: 'dsh-codex-usage',
+          order: 1000,
+          label: () => t('title'),
+        }, Dock));
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
           id: 'dsh-codex-usage',

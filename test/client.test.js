@@ -29,7 +29,7 @@ test('registers settings and sidebar; persists display switches and handles week
   vm.runInNewContext(source, context);
   const ctx = { effect: (fn) => fn(), locale: { register: () => {}, bind: () => (key, vars) => vars?.percent === undefined ? key : `${key}:${vars.percent}` }, slots: { inject: (_name, fn) => fn(), register: (options, component) => { registrations.push({ options, component }); } } };
   plugin.apply(ctx);
-  assert.deepEqual(registrations.map((x) => x.options.name).sort(), ['settings.section', 'sidebar.footer.action']);
+  assert.deepEqual(registrations.map((x) => x.options.name).sort(), ['conversation.composer.dock', 'settings.section', 'sidebar.footer.action']);
   const sidebar = registrations.find((x) => x.options.name === 'sidebar.footer.action').component;
   const card = sidebar({ wide: true });
   const text = JSON.stringify(card);
@@ -66,7 +66,7 @@ test('registers settings and sidebar; persists display switches and handles week
   let settings = settingsComponent();
   assert.match(JSON.stringify(settings), /settingsTitle/);
   let switches = findNodes(settings, (node) => node.props?.role === 'switch');
-  assert.equal(switches.length, 3);
+  assert.equal(switches.length, 5);
   assert.ok(switches.every((node) => node.props.checked));
   const masterSwitch = switches.find((node) => node.props.id === 'dcu-sidebar-enabled');
   assert.equal(masterSwitch.props['aria-controls'], 'dcu-settings-display-children');
@@ -91,7 +91,11 @@ test('registers settings and sidebar; persists display switches and handles week
   switches = findNodes(settings, (node) => node.props?.role === 'switch');
   const disabledChildGroup = findNodes(settings, (node) => node.props?.role === 'group' && node.props.id === 'dcu-settings-display-children')[0];
   assert.equal(disabledChildGroup.props['aria-disabled'], true);
-  assert.ok(switches.filter((node) => node.props.id !== 'dcu-sidebar-enabled').every((node) => node.props.disabled));
+  assert.ok(switches.filter((node) => ['dcu-show-five-hour', 'dcu-show-weekly'].includes(node.props.id)).every((node) => node.props.disabled));
+  assert.ok(switches.filter((node) => node.props.id.startsWith('dcu-dock-show-')).every((node) => !node.props.disabled && node.props.checked));
+  switches.find((node) => node.props.id === 'dcu-dock-show-five-hour').props.onChange({ target: { checked: false } });
+  assert.deepEqual(JSON.parse(stored.get('dsh-codex-usage.dock-settings')), { showFiveHour: false, showWeekly: true });
+  assert.deepEqual(JSON.parse(stored.get('dsh-codex-usage.display-settings')), { enabled: false, showFiveHour: false, showWeekly: false });
   assert.equal(sidebar({ wide: true }), null);
 });
 
@@ -153,11 +157,11 @@ test('waits for the actual slots when sidebar parents appear before their childr
   };
   plugin.apply({ effect: (fn) => fn(), locale: { register() {}, bind: () => () => '' }, slots });
   assert.equal(registrations.length, 0);
-  for (const name of ['sidebar.footer.action', 'settings.section']) {
+  for (const name of ['sidebar.footer.action', 'settings.section', 'conversation.composer.dock']) {
     declared.add(name);
     pending.get(name)?.();
   }
-  assert.deepEqual(registrations.sort(), ['settings.section', 'sidebar.footer.action']);
+  assert.deepEqual(registrations.sort(), ['conversation.composer.dock', 'settings.section', 'sidebar.footer.action']);
 });
 
 test('refresh retries failures and keeps last successful windows marked stale', async () => {
