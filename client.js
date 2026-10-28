@@ -166,11 +166,12 @@ window.__ModuleLoader__.load({
       } catch { return { ...defaultDisplaySettings }; }
     }
     const dockSettingsKey = 'dsh-codex-usage.dock-settings';
-    const defaultDockSettings = { showFiveHour: true, showWeekly: true };
+    const defaultDockSettings = { enabled: true, showFiveHour: true, showWeekly: true };
     function readDockSettings() {
       try {
         const value = JSON.parse(window.localStorage.getItem(dockSettingsKey));
         return {
+          enabled: typeof value?.enabled === 'boolean' ? value.enabled : true,
           showFiveHour: typeof value?.showFiveHour === 'boolean' ? value.showFiveHour : true,
           showWeekly: typeof value?.showWeekly === 'boolean' ? value.showWeekly : true,
         };
@@ -456,7 +457,7 @@ window.__ModuleLoader__.load({
           const next = readDisplaySettings();
           setDisplaySettings((current) => current.enabled === next.enabled && current.showFiveHour === next.showFiveHour && current.showWeekly === next.showWeekly ? current : next);
           const nextDock = readDockSettings();
-          setDockSettings((current) => current.showFiveHour === nextDock.showFiveHour && current.showWeekly === nextDock.showWeekly ? current : nextDock);
+          setDockSettings((current) => current.enabled === nextDock.enabled && current.showFiveHour === nextDock.showFiveHour && current.showWeekly === nextDock.showWeekly ? current : nextDock);
         };
         window.addEventListener('dsh-codex-usage-preferences-change', sync);
         window.addEventListener('storage', sync);
@@ -466,7 +467,7 @@ window.__ModuleLoader__.load({
         };
       }, []);
 
-      const shouldFetch = settings || (dock ? dockSettings.showFiveHour || dockSettings.showWeekly : displaySettings.enabled);
+      const shouldFetch = settings || (dock ? dockSettings.enabled && (dockSettings.showFiveHour || dockSettings.showWeekly) : displaySettings.enabled);
       React.useEffect(() => {
         if (shouldFetch) return usageStore.retain(!settings);
       }, [settings, shouldFetch]);
@@ -542,8 +543,8 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dcu-settings-copy' },
             h('label', { className: 'dcu-settings-label', id: `${id}-label`, htmlFor: id }, t(labelKey)),
             h('p', { className: 'dcu-settings-description' }, t(hintKey)),
-            (footer ? dockSaveError && key === 'showFiveHour' : displaySaveError && key === 'enabled') ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
-          h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: preferences[key], 'aria-checked': preferences[key], 'aria-labelledby': `${id}-label`, 'aria-controls': !footer && key === 'enabled' ? 'dcu-settings-display-children' : undefined, disabled: !footer && key !== 'enabled' && !displaySettings.enabled, onChange: (event) => (footer ? changeDockSetting : changeDisplaySetting)(key, event.target.checked) }));
+            (key === 'enabled' && (footer ? dockSaveError : displaySaveError)) ? h('p', { className: 'dcu-settings-description dcu-settings-error', role: 'alert' }, t('saveFailed')) : null),
+          h('input', { id, className: 'dcu-settings-control dcu-settings-switch', type: 'checkbox', role: 'switch', checked: preferences[key], 'aria-checked': preferences[key], 'aria-labelledby': `${id}-label`, 'aria-controls': key === 'enabled' ? (footer ? 'dcu-settings-dock-children' : 'dcu-settings-display-children') : undefined, disabled: key !== 'enabled' && !preferences.enabled, onChange: (event) => (footer ? changeDockSetting : changeDisplaySetting)(key, event.target.checked) }));
       };
 
       if (settings) return h('div', { className: 'dcu-settings' },
@@ -614,11 +615,8 @@ window.__ModuleLoader__.load({
         h('div', { id: 'dcu-settings-display-children', className: 'dcu-settings-display-children', role: 'group', 'aria-labelledby': 'dcu-sidebar-enabled-label', 'aria-disabled': !displaySettings.enabled },
           displaySettingRow('showFiveHour', 'fiveHourDisplay', 'fiveHourDisplayHint', 'dcu-show-five-hour'),
           displaySettingRow('showWeekly', 'weeklyDisplay', 'weeklyDisplayHint', 'dcu-show-weekly')),
-        h('div', { className: 'dcu-settings-row' },
-          h('div', { className: 'dcu-settings-copy' },
-            h('span', { className: 'dcu-settings-label', id: 'dcu-dock-display-label' }, t('dockDisplay')),
-            h('p', { className: 'dcu-settings-description' }, t('dockDisplayHint')))),
-        h('div', { className: 'dcu-settings-display-children', role: 'group', 'aria-labelledby': 'dcu-dock-display-label' },
+        displaySettingRow('enabled', 'dockDisplay', 'dockDisplayHint', 'dcu-dock-enabled', true),
+        h('div', { id: 'dcu-settings-dock-children', className: 'dcu-settings-display-children', role: 'group', 'aria-labelledby': 'dcu-dock-enabled-label', 'aria-disabled': !dockSettings.enabled },
           displaySettingRow('showFiveHour', 'fiveHourDisplay', 'dockFiveHourDisplayHint', 'dcu-dock-show-five-hour', true),
           displaySettingRow('showWeekly', 'weeklyDisplay', 'dockWeeklyDisplayHint', 'dcu-dock-show-weekly', true)),
         h('div', { className: 'dcu-settings-row' },

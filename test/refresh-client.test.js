@@ -272,7 +272,7 @@ test('hiding one surface preserves the shared request; hiding the last aborts it
   assert.equal(app.render('sidebar'), null);
   assert.equal(app.requests[0].signal.aborted, false);
   assert.equal(app.polls().length, 1);
-  app.stored.set('dsh-codex-usage.dock-settings', JSON.stringify({ showFiveHour: false, showWeekly: false }));
+  app.stored.set('dsh-codex-usage.dock-settings', JSON.stringify({ enabled: false, showFiveHour: false, showWeekly: true }));
   app.dispatch('dsh-codex-usage-preferences-change');
   assert.equal(app.render('dock'), null);
   assert.equal(app.requests[0].signal.aborted, true);
