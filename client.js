@@ -53,7 +53,7 @@ window.__ModuleLoader__.load({
         dockFiveHourShort: '5h', dockWeeklyShort: '1 周', dockDisplay: '底栏组件', dockDisplayHint: '在底栏显示 Codex 用量组件', dockFiveHourDisplayHint: '在底栏显示 5 小时限额', dockWeeklyDisplayHint: '在底栏显示每周限额',
         used: '剩余 {percent}%',
         usedShort: '剩余 {percent}%',
-        settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', sidebarDisplay: '侧栏卡片', sidebarDisplayHint: '在侧栏显示 Codex 用量卡片', fiveHourDisplay: '5 小时限额', fiveHourDisplayHint: '在侧栏显示 5 小时限额', weeklyDisplay: '每周限额', weeklyDisplayHint: '在侧栏显示每周限额', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存设置'
+        settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', sidebarDisplay: '侧栏卡片', sidebarDisplayHint: '在侧栏显示 Codex 用量卡片', fiveHourDisplay: '5 小时限额', fiveHourDisplayHint: '在侧栏显示 5 小时限额', weeklyDisplay: '每周限额', weeklyDisplayHint: '在侧栏显示每周限额', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存设置',
         resetAt: '{time} 重置',
         resetShort: '{time} 重置',
         resetUnknown: '重置时间不可用',
