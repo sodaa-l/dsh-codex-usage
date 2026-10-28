@@ -3,6 +3,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react');
     const h = React.createElement;
+    const Tooltip = require('@deepseek-ai/dsh-client-ui-primitives').Tooltip;
     const namespace = 'dsh-codex-usage';
     const apiPath = '/api/dsh-codex-usage';
     const statuses = [
@@ -401,7 +402,8 @@ window.__ModuleLoader__.load({
           .dcu-popover .dcu-card { padding: 13px 12px 11px; }
           @media (prefers-reduced-motion: reduce) { .dcu-dock-fill { transition: none; } }
         `),
-        h('button', { ref: triggerRef, className: 'dcu-dock-trigger', type: 'button', 'aria-label': description, title: description, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-controls': open ? panelId : undefined, onClick: () => { setPosition(undefined); setOpen(!open); } },
+        h(Tooltip, { label: description, side: 'top', delayMs: 200, disabled: open },
+          h('button', { ref: triggerRef, className: 'dcu-dock-trigger', type: 'button', 'aria-label': description, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-controls': open ? panelId : undefined, onClick: () => { setPosition(undefined); setOpen(!open); } },
           h(Logo),
           ...readings.flatMap(({ key, label, percent }, index) => [
             index ? h('span', { key: `${key}-separator`, 'aria-hidden': true }, '・') : null,
@@ -410,7 +412,7 @@ window.__ModuleLoader__.load({
               h('span', { className: 'dcu-dock-track', role: 'progressbar', 'aria-label': t(key), 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': percent, 'aria-valuetext': percent === undefined ? t('unavailable') : t('used', { percent }) },
                 h('span', { className: 'dcu-dock-fill', style: { width: `${percent ?? 0}%` } })),
               h('span', { className: 'dcu-dock-percent' }, percent === undefined ? '—' : `${percent}%`)),
-          ])),
+          ]))),
         open ? h('div', { ref: panelRef, id: panelId, className: 'dcu-popover', popover: 'manual', tabIndex: -1, role: 'dialog', 'aria-label': t('title'), style: position ?? { visibility: 'hidden' } }, card) : null,
       );
     }
