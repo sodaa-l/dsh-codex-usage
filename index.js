@@ -133,9 +133,9 @@ export function apply(ctx, config = {}) {
             value = auth.submit(JSON.parse(body).value);
           }
           else if (request.method === 'POST' && (action === 'cancel' || action === 'logout')) {
-            await usage.clear();
             if (action === 'logout') await auth.logout();
             else await auth.cancel();
+            await usage.clear();
             value = { phase: 'idle' };
           } else if (request.method === 'GET') {
             value = { ...auth.status(), account: await auth.account() };

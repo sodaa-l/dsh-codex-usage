@@ -11,6 +11,45 @@ function fakeCredentials() {
     async deleteRecord() { await chain; record = undefined; },
   };
 }
+test('logout releases pending and queued credential writes and discards late results', { timeout: 2000 }, async () => {
+  const store = createCredentialStore(fakeCredentials());
+  await store.modify('openai-codex', async () => sample);
+  let finishRefresh;
+  let started;
+  const refreshing = new Promise((resolve) => { started = resolve; });
+  const pending = store.modify('openai-codex', async () => {
+    started();
+    return new Promise((resolve) => { finishRefresh = resolve; });
+  });
+  const rejected = assert.rejects(pending, { name: 'AbortError' });
+  await refreshing;
+  let queuedRan = false;
+  const queued = store.modify('openai-codex', async () => { queuedRan = true; return sample; });
+  const queuedRejected = assert.rejects(queued, { name: 'AbortError' });
+  await store.delete('openai-codex');
+  await Promise.all([rejected, queuedRejected]);
+  assert.equal(queuedRan, false);
+  assert.equal(await store.read('openai-codex'), undefined);
+  await store.modify('openai-codex', async () => ({ ...sample, access: 'new-login' }));
+  finishRefresh({ ...sample, access: 'late-refresh' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await store.read('openai-codex')).access, 'new-login');
+});
+
+test('WHAM distinguishes missing credentials and 401 from regional or network failures', async () => {
+  const signal = new AbortController().signal;
+  let fetched = false;
+  const missing = createWhamReader({ resolve: async () => undefined }, { fetchImpl: async () => { fetched = true; } });
+  assert.deepEqual(await missing({ signal }), { status: 'not-authenticated' });
+  assert.equal(fetched, false);
+  for (const [code, status] of [[401, 'not-authenticated'], [403, 'rate-limits-unavailable'], [429, 'rate-limits-unavailable'], [503, 'rate-limits-unavailable']]) {
+    const reader = createWhamReader({ resolve: async () => ({ auth: { apiKey: 'secret' } }) }, { fetchImpl: async () => new Response(null, { status: code }) });
+    assert.deepEqual(await reader({ signal }), { status });
+  }
+  const offline = createWhamReader({ resolve: async () => { throw new TypeError('fetch failed'); } });
+  assert.deepEqual(await offline({ signal }), { status: 'unavailable' });
+});
+
 const sample = { type: 'oauth', access: 'secret-access', refresh: 'secret-refresh', expires: 123, accountId: 'account' };
 
 test('credential modifications serialize and leave the previous value on failure', async () => {

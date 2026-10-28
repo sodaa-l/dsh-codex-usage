@@ -8,7 +8,22 @@ function credential(record) {
   return value;
 }
 
+// Release the credential lock on logout even when the provider ignores cancellation.
+function waitForOperation(operation, signal) {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => { cleanup(); reject(signal.reason); };
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve().then(() => { signal.throwIfAborted(); return operation(); }).then(
+      (value) => { cleanup(); resolve(value); },
+      (error) => { cleanup(); reject(error); },
+    );
+  });
+}
+
 export function createCredentialStore(credentials) {
+  let writes = new AbortController();
   const check = (id, options) => {
     if (id !== PROVIDER) throw new Error('Unsupported provider');
     options?.signal?.throwIfAborted();
@@ -21,15 +36,21 @@ export function createCredentialStore(credentials) {
     },
     async modify(id, fn, options) {
       check(id, options);
+      const signal = options?.signal ? AbortSignal.any([options.signal, writes.signal]) : writes.signal;
       const record = await credentials.modifyRecord(KEY, async (current) => {
-        check(id, options);
-        const next = await fn(credential(current));
-        check(id, options);
+        signal.throwIfAborted();
+        const next = await waitForOperation(() => fn(credential(current)), signal);
+        signal.throwIfAborted();
         return next === undefined ? undefined : { kind: 'grant', payload: credential({ kind: 'grant', payload: next }) };
       });
       return credential(record);
     },
-    async delete(id, options) { check(id, options); await credentials.deleteRecord(KEY); },
+    async delete(id, options) {
+      check(id, options);
+      writes.abort();
+      writes = new AbortController();
+      await credentials.deleteRecord(KEY);
+    },
   };
 }
 
@@ -139,7 +160,7 @@ export function createWhamReader(auth, { timeoutMs = 15000, fetchImpl = fetch } 
       if (!resolved?.auth?.apiKey) return { status: 'not-authenticated' };
       const headers = { ...resolved.auth.headers, authorization: `Bearer ${resolved.auth.apiKey}`, accept: 'application/json' };
       const response = await fetchImpl('https://chatgpt.com/backend-api/wham/usage', { headers, signal: combined });
-      if (response.status === 401 || response.status === 403) return { status: 'not-authenticated' };
+      if (response.status === 401) return { status: 'not-authenticated' };
       if (!response.ok) return { status: 'rate-limits-unavailable' };
       const windows = normalizeWhamUsage(await response.json());
       return windows.fiveHour || windows.weekly ? { status: 'ok', windows } : { status: 'rate-limits-unavailable' };

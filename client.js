@@ -17,6 +17,7 @@ window.__ModuleLoader__.load({
     const dictionaries = {
       en: {
         login: 'Sign in', cancelLogin: 'Cancel', logout: 'Sign out', loginStarting: 'Preparing sign-in…', loginFailed: 'Sign-in failed. Please try again.', browserPrompt: 'Complete sign-in in your browser.', openBrowser: 'Open sign-in page', manualPrompt: 'If the callback fails, paste the redirected URL here:', submitCallback: 'Submit',
+        logoutFailed: 'Could not sign out. Please try again.', authStatusFailed: 'Could not read sign-in status. Please try again.',
         accountEmail: 'Email', accountPlan: 'Plan', accountId: 'Account ID', accountConnected: 'Connected',
         staleUsage: 'Refresh failed; showing the last available usage.',
         title: 'Codex usage',
@@ -40,6 +41,7 @@ window.__ModuleLoader__.load({
       },
       zh: {
         login: '登录', cancelLogin: '取消', logout: '退出登录', loginStarting: '正在准备登录…', loginFailed: '登录失败，请重试。', browserPrompt: '请在浏览器中完成登录。', openBrowser: '打开登录页面', manualPrompt: '如果自动回调失败，请粘贴浏览器跳转后的地址：', submitCallback: '提交',
+        logoutFailed: '退出登录失败，请重试。', authStatusFailed: '无法读取登录状态，请重试。',
         accountEmail: '邮箱', accountPlan: '套餐', accountId: '账号 ID', accountConnected: '已连接',
         staleUsage: '刷新失败，显示上次获取的额度。',
         title: 'Codex 用量',
@@ -166,7 +168,7 @@ window.__ModuleLoader__.load({
     function AppServerCard({ wide, t, settings = false }) {
       const [snapshot, setSnapshot] = React.useState(null);
       const [refreshing, setRefreshing] = React.useState(false);
-      const [login, setLogin] = React.useState({ phase: 'idle' });
+      const [login, setLogin] = React.useState({ phase: 'loading' });
       const [callbackUrl, setCallbackUrl] = React.useState('');
       const [interval, setIntervalMs] = React.useState(readInterval);
       const [displaySettings, setDisplaySettings] = React.useState(readDisplaySettings);
@@ -186,6 +188,7 @@ window.__ModuleLoader__.load({
       };
       const loginWindow = React.useRef(null);
       const initialAuthRequest = React.useRef(null);
+      const authVersion = React.useRef(0);
       const activeRequest = React.useRef(null);
       const locale = document.documentElement.lang || undefined;
 
@@ -264,15 +267,25 @@ window.__ModuleLoader__.load({
       }, [refresh, interval, settings, shouldFetch]);
 
       const authAction = React.useCallback(async (action, input) => {
+        const version = ++authVersion.current;
         initialAuthRequest.current?.abort();
+        if (action === 'logout') activeRequest.current?.abort();
         try {
           const response = await fetch(`${apiPath}/auth?action=${action}`, { method: 'POST', credentials: 'same-origin', ...(action === 'submit' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value: input }) } : {}) });
           if (!response.ok) throw new Error('Authentication failed');
           const value = await response.json();
+          if (version !== authVersion.current) return;
+          authVersion.current++;
           setLogin(value);
-          if (action === 'logout') { await refresh(true); signalChange(); }
-        } catch { setLogin({ phase: 'failed' }); }
-      }, [refresh]);
+          if (action === 'logout') {
+            activeRequest.current?.abort();
+            setSnapshot({ status: 'not-authenticated', windows: { fiveHour: null, weekly: null } });
+            signalChange();
+          }
+        } catch {
+          if (version === authVersion.current) setLogin((previous) => ({ ...previous, error: action === 'logout' ? 'logoutFailed' : 'loginFailed', ...(action === 'start' ? { phase: 'failed' } : {}) }));
+        }
+      }, []);
 
       const startLogin = () => {
         loginWindow.current = window.open('', '_blank');
@@ -295,27 +308,29 @@ window.__ModuleLoader__.load({
         fetch(`${apiPath}/auth`, { credentials: 'same-origin', signal: controller.signal })
           .then((response) => { if (!response.ok) throw new Error('Authentication failed'); return response.json(); })
           .then((value) => { if (!controller.signal.aborted) setLogin(value); })
-          .catch(() => { if (!controller.signal.aborted) setLogin({ phase: 'failed' }); });
-        return () => controller.abort();
+          .catch(() => { if (!controller.signal.aborted) setLogin((previous) => ({ ...previous, error: 'authStatusFailed' })); });
+        return () => { controller.abort(); authVersion.current++; };
       }, [settings]);
 
       React.useEffect(() => {
         if (!['starting', 'waiting'].includes(login.phase)) return;
         const controller = new AbortController();
         const timer = setInterval(async () => {
+          const version = authVersion.current;
           try {
             const response = await fetch(`${apiPath}/auth`, { credentials: 'same-origin', signal: controller.signal });
             if (!response.ok) throw new Error('Authentication failed');
             const value = await response.json();
-            if (controller.signal.aborted) return;
+            if (controller.signal.aborted || version !== authVersion.current) return;
             setLogin(value);
             if (value.phase === 'authenticated') { await refresh(true); signalChange(); }
-          } catch { if (!controller.signal.aborted) setLogin({ phase: 'failed' }); }
+          } catch { if (!controller.signal.aborted && version === authVersion.current) setLogin((previous) => ({ ...previous, error: 'authStatusFailed' })); }
         }, 2000);
         return () => { clearInterval(timer); controller.abort(); };
       }, [login.phase, refresh]);
 
       const status = snapshot?.status ?? 'loading';
+      const connected = Boolean(login.account) || login.phase === 'authenticated' || status === 'ok';
       const statusMessage = snapshot?.stale || status === 'ok'
         ? null
         : t(status === 'loading' ? 'loading' : (statusKeys[status] ?? 'statusUnavailable'));
@@ -376,14 +391,15 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label' }, t('account')),
             h('p', { className: 'dcu-settings-description', role: 'status' },
-              login.phase === 'starting' ? t('loginStarting') : login.phase === 'failed' ? t('loginFailed') : statusMessage || (login.account ? t('accountConnected') : t('accountHint'))),
+              login.error ? t(login.error) : login.phase === 'starting' ? t('loginStarting') : connected ? t('accountConnected') : login.phase === 'loading' ? t('loading') : login.phase === 'failed' ? t('loginFailed') : statusMessage || t('accountHint')),
             login.account ? ['email', 'plan', 'accountId'].map((key) => login.account[key] ? h('p', { key, className: 'dcu-settings-description dcu-settings-account-detail' }, `${t(key === 'email' ? 'accountEmail' : key === 'plan' ? 'accountPlan' : 'accountId')}: ${login.account[key]}`) : null) : null),
           h('div', { className: 'dcu-settings-control' },
             ['starting', 'waiting'].includes(login.phase)
               ? h('button', { className: 'dcu-settings-button', type: 'button', onClick: () => void authAction('cancel') }, t('cancelLogin'))
-              : status === 'not-authenticated' || login.phase === 'failed'
-                ? h('button', { className: 'dcu-settings-button', type: 'button', onClick: startLogin }, t('login'))
-                : status !== 'loading' ? h('button', { className: 'dcu-settings-button', type: 'button', onClick: () => void authAction('logout') }, t('logout')) : null)),
+              : connected
+                ? h('button', { className: 'dcu-settings-button', type: 'button', onClick: () => void authAction('logout') }, t('logout'))
+                : login.phase !== 'loading' || login.error
+                  ? h('button', { className: 'dcu-settings-button', type: 'button', onClick: startLogin }, t('login')) : null)),
         login.phase === 'waiting' ? h('div', { className: 'dcu-settings-extra' },
           h('p', null, t('browserPrompt'), ' ', h('a', { href: login.authUrl, target: '_blank', rel: 'noopener noreferrer' }, t('openBrowser'))),
           h('details', null, h('summary', null, t('manualPrompt')),
