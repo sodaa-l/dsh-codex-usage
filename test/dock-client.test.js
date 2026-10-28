@@ -60,6 +60,8 @@ test('footer stays independent of sidebar and renders remaining limits with inde
   let tree = app.render();
   const progress = find(tree, (node) => node.props.role === 'progressbar');
   assert.deepEqual(progress.map((node) => node.props['aria-valuenow']), [76, 55]);
+  assert.deepEqual(find(tree, (node) => node.props.className === 'dcu-dock-percent').map((node) => node.children[0]), ['76%', '55%']);
+  assert.doesNotMatch(JSON.stringify(tree), /resetAt|resetUnknown/);
   assert.match(JSON.stringify(tree), /dockFiveHourShort/);
   assert.match(JSON.stringify(tree), /dockWeeklyShort/);
   assert.equal(find(tree, (node) => node.props.className === 'dcu-dock-limit').length, 2);
@@ -84,6 +86,7 @@ test('footer handles weekly-only, unavailable, stale windows and corrupt prefere
   tree = app.render();
   assert.equal(find(tree, (node) => node.props.role === 'progressbar').length, 2);
   assert.ok(find(tree, (node) => node.props.role === 'progressbar').every((node) => node.props['aria-valuenow'] === undefined));
+  assert.deepEqual(find(tree, (node) => node.props.className === 'dcu-dock-percent').map((node) => node.children[0]), ['—', '—']);
   assert.match(find(tree, (node) => node.type === 'button')[0].props.title, /statusUnavailable/);
   app.setSnapshot({ ...both, status: 'unavailable', stale: true });
   tree = app.render();
@@ -104,6 +107,7 @@ test('footer opens the complete shared card above its trigger and cleans up dism
   assert.equal(button.props['aria-controls'], panel.props.id);
   assert.equal(panel.props.popover, 'manual');
   assert.equal(find(panel, (node) => node.props.className === 'dcu-limit').length, 2);
+  assert.equal(find(panel, (node) => node.props.className === 'dcu-reset' && node.children[0] === 'resetAt').length, 2);
   let shown = 0, focused = 0;
   const triggerElement = { getBoundingClientRect: () => ({ right: 950, top: 600 }), focus: () => { focused++; } };
   const panelElement = { isConnected: true, showPopover: () => { shown++; }, hidePopover() {}, getBoundingClientRect: () => ({ width: 280 }) };

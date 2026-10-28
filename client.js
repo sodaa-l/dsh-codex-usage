@@ -178,7 +178,7 @@ window.__ModuleLoader__.load({
     const signalChange = () => window.dispatchEvent(new Event('dsh-codex-usage-change'));
     const signalPreferenceChange = () => window.dispatchEvent(new Event('dsh-codex-usage-preferences-change'));
 
-    function DockUsage({ snapshot, preferences, t, locale, statusMessage, card }) {
+    function DockUsage({ snapshot, preferences, t, statusMessage, card }) {
       const [open, setOpen] = React.useState(false);
       const [position, setPosition] = React.useState(undefined);
       const rootRef = React.useRef(null);
@@ -238,11 +238,10 @@ window.__ModuleLoader__.load({
       if (!available) return null;
       const readings = limits.map(({ key, label }) => {
         const limit = snapshot?.windows[key];
-        const reset = resetTime(limit?.resetsAt, locale, key === 'weekly');
-        return { key, label, percent: limit ? 100 - limit.usedPercent : undefined, reset };
+        return { key, label, percent: limit ? 100 - limit.usedPercent : undefined };
       });
-      const description = [t('title'), statusMessage, ...readings.map(({ label, percent, reset }) =>
-        `${t(label)} ${percent === undefined ? t('unavailable') : t('used', { percent })} ${reset ? t('resetAt', { time: reset }) : t('resetUnknown')}`)].filter(Boolean).join(' · ');
+      const description = [t('title'), statusMessage, ...readings.map(({ label, percent }) =>
+        `${t(label)} ${percent === undefined ? t('unavailable') : t('used', { percent })}`)].filter(Boolean).join(' · ');
       return h('span', { ref: rootRef, className: 'dcu-dock', onBlur: (event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); } },
         h('style', null, `
           [data-composer-dock]:has(.dcu-dock) { width: 100%; max-width: var(--dsh-composer-card-max-width, 100%); flex-wrap: wrap; }
@@ -261,13 +260,13 @@ window.__ModuleLoader__.load({
         `),
         h('button', { ref: triggerRef, className: 'dcu-dock-trigger', type: 'button', 'aria-label': description, title: description, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-controls': open ? panelId : undefined, onClick: () => { setPosition(undefined); setOpen(!open); } },
           h(Logo),
-          ...readings.flatMap(({ key, label, percent, reset }, index) => [
+          ...readings.flatMap(({ key, label, percent }, index) => [
             index ? h('span', { key: `${key}-separator`, 'aria-hidden': true }, '・') : null,
             h('span', { key, className: 'dcu-dock-limit' },
               h('span', null, t(label)),
               h('span', { className: 'dcu-dock-track', role: 'progressbar', 'aria-label': t(key), 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': percent, 'aria-valuetext': percent === undefined ? t('unavailable') : t('used', { percent }) },
                 h('span', { className: 'dcu-dock-fill', style: { width: `${percent ?? 0}%` } })),
-              h('span', null, reset ?? '—')),
+              h('span', { className: 'dcu-dock-percent' }, percent === undefined ? '—' : `${percent}%`)),
           ])),
         open ? h('div', { ref: panelRef, id: panelId, className: 'dcu-popover', popover: 'manual', tabIndex: -1, role: 'dialog', 'aria-label': t('title'), style: position ?? { visibility: 'hidden' } }, card) : null,
       );
@@ -699,7 +698,7 @@ window.__ModuleLoader__.load({
           }) : null,
         ),
       );
-      if (dock) return shouldFetch ? h(DockUsage, { snapshot, preferences: dockSettings, t, locale, statusMessage, card: renderCard(defaultDisplaySettings, true) }) : null;
+      if (dock) return shouldFetch ? h(DockUsage, { snapshot, preferences: dockSettings, t, statusMessage, card: renderCard(defaultDisplaySettings, true) }) : null;
       return displaySettings.enabled ? renderCard(displaySettings) : null;
     }
 

@@ -62,7 +62,7 @@ Client 不持有 OAuth access/refresh token。侧栏把服务返回的 `usedPerc
 - Client 分别等待 `sidebar.footer.action`、`conversation.composer.dock` 和 `settings.section` 这三个实际子插槽出现后再注册。不要只等待父级 `sidebar` 或 `sidebar.settings`：父级可能先于子级声明。
 - 侧栏卡片注册顺序为 `-1000`，设置页为 `35`。卡片通过局部 CSS 适配整行宽度，并使用 DSH 字体和主题 token。
 - 卡片挂载时读取一次；侧栏挂载且总开关开启期间，按浏览器本地设置的间隔自动刷新。关闭总开关会隐藏卡片并停止侧栏轮询。设置页提供侧栏总开关及其 5 小时/每周窗口子开关；子开关缩进显示，并在总开关关闭时禁用且保留已保存的选择；设置页也提供手动刷新。可选刷新间隔为 1、5、15、30 分钟，默认 1 分钟；间隔和三个显示开关默认均开启，并保存在当前浏览器的 `localStorage`。
-- 底栏控件注册于 `conversation.composer.dock`，顺序为 `1000`。局部 CSS 将其排列到该行最右端，并允许窄窗口换行；文字使用与上下文控件相同的 `--dsw-alias-label-tertiary`，进度条沿用卡片的 `--dsw-alias-state-business-primary`，尺寸为 36×8px。
+- 底栏控件注册于 `conversation.composer.dock`，顺序为 `1000`。局部 CSS 将其排列到该行最右端，并允许窄窗口换行；文字使用与上下文控件相同的 `--dsw-alias-label-tertiary`，进度条沿用卡片的 `--dsw-alias-state-business-primary`，尺寸为 36×8px。每条进度条后显示剩余额度 `X%`，底栏及其悬浮提示不显示重置时间；重置时间保留在完整卡片中。
 - 底栏开关单独保存在 `dsh-codex-usage.dock-settings` 的 `showFiveHour` / `showWeekly`，默认均开启。与侧栏偏好分离；两项关闭时隐藏底栏并停止其请求与计时器，偏好通过原有浏览器事件同步。每个可见入口沿用既有刷新流程；弹层只展示该入口的快照，不创建独立轮询，Host 合并并缓存并发请求。
 - 底栏点击展开完整卡片，复用 `renderCard` 和 `LimitRow`，始终展示套餐支持的窗口。原生 `popover="manual"` 使面板进入顶层而仍位于自身插槽 DOM；按自有触发器测量定位到上方，监听窗口滚动/缩放和自身尺寸变化。再次点击、外部点击、焦点离开或 Esc 收起；关闭/卸载清理监听器和观察器，Esc 恢复触发器焦点。
 - OAuth 页面由用户点击登录时预先打开空白页，之后再导航到授权地址，以降低弹窗拦截概率。若自动回调无法完成，可提交浏览器重定向后的完整 URL。
