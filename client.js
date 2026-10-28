@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
         weekly: 'Weekly limit',
         fiveHourShort: '5h',
         weeklyShort: 'Week',
-        dockFiveHourShort: '5h', dockWeeklyShort: '1w', dockDisplay: 'Footer display', dockDisplayHint: 'Show limits at the right of the footer. Turn off both to hide the control.', dockFiveHourDisplayHint: 'Show the 5-hour limit in the footer.', dockWeeklyDisplayHint: 'Show the weekly limit in the footer.',
+        dockFiveHourShort: '5h', dockWeeklyShort: '1w', dockDisplay: 'Footer display', dockDisplayHint: 'Show limits after the other footer controls. Turn off both to hide the control.', dockFiveHourDisplayHint: 'Show the 5-hour limit in the footer.', dockWeeklyDisplayHint: 'Show the weekly limit in the footer.',
         used: 'Remaining {percent}%',
         usedShort: '{percent}% left',
         settingsTitle: 'Codex usage', account: 'Account', accountHint: 'Connect your ChatGPT account to view Codex limits.', sidebarDisplay: 'Sidebar display', sidebarDisplayHint: 'Show the Codex usage card in the sidebar.', fiveHourDisplay: '5-hour limit', fiveHourDisplayHint: 'Show the 5-hour limit in the sidebar.', weeklyDisplay: 'Weekly limit', weeklyDisplayHint: 'Show the weekly limit in the sidebar.', refreshTitle: 'Refresh usage', refreshHint: 'Update the displayed limits now.', refreshPeriod: 'Refresh interval', everyMinute: '1 minute', everyFiveMinutes: '5 minutes', everyFifteenMinutes: '15 minutes', everyThirtyMinutes: '30 minutes', settingsHint: 'The interval is saved in this browser.', saveFailed: 'Could not save this setting in this browser.',
@@ -50,7 +50,7 @@ window.__ModuleLoader__.load({
         weekly: '每周限额',
         fiveHourShort: '5小时',
         weeklyShort: '每周',
-        dockFiveHourShort: '5h', dockWeeklyShort: '1 周', dockDisplay: '底栏显示', dockDisplayHint: '在底栏右端显示额度，关闭两项即可隐藏控件。', dockFiveHourDisplayHint: '在底栏显示 5 小时限额。', dockWeeklyDisplayHint: '在底栏显示每周限额。',
+        dockFiveHourShort: '5h', dockWeeklyShort: '1 周', dockDisplay: '底栏显示', dockDisplayHint: '在底栏其他控件之后显示额度，关闭两项即可隐藏控件。', dockFiveHourDisplayHint: '在底栏显示 5 小时限额。', dockWeeklyDisplayHint: '在底栏显示每周限额。',
         used: '剩余 {percent}%',
         usedShort: '剩余 {percent}%',
         settingsTitle: 'Codex 额度显示', account: '账号', accountHint: '连接 ChatGPT 账号以查看 Codex 额度', sidebarDisplay: '侧栏总开关', sidebarDisplayHint: '在侧栏显示 Codex 用量卡片。', fiveHourDisplay: '5 小时限额', fiveHourDisplayHint: '在侧栏显示 5 小时限额。', weeklyDisplay: '每周限额', weeklyDisplayHint: '在侧栏显示每周限额。', refreshTitle: '刷新用量', refreshHint: '立即更新显示的额度', refreshPeriod: '刷新周期', everyMinute: '1 分钟', everyFiveMinutes: '5 分钟', everyFifteenMinutes: '15 分钟', everyThirtyMinutes: '30 分钟', settingsHint: '刷新周期保存在当前浏览器中', saveFailed: '无法在当前浏览器中保存设置。',
@@ -175,8 +175,151 @@ window.__ModuleLoader__.load({
         };
       } catch { return { ...defaultDockSettings }; }
     }
-    const signalChange = () => window.dispatchEvent(new Event('dsh-codex-usage-change'));
     const signalPreferenceChange = () => window.dispatchEvent(new Event('dsh-codex-usage-preferences-change'));
+
+    function createUsageStore() {
+      let state = { snapshot: null, refreshing: false };
+      const listeners = new Set();
+      const handledResets = new Map();
+      let consumers = 0, pollers = 0, disposed = false;
+      let activeRequest, queuedForce = false, pollTimer, resetTimer;
+      let intervalMs = readInterval();
+      const publish = (next) => { state = next; for (const listener of listeners) listener(); };
+      const cancel = () => {
+        const request = activeRequest;
+        activeRequest = undefined;
+        queuedForce = false;
+        request?.controller.abort();
+        if (state.refreshing) publish({ ...state, refreshing: false });
+      };
+      const resetTimes = () => ['fiveHour', 'weekly'].flatMap((key) => {
+        const value = state.snapshot?.windows[key]?.resetsAt;
+        const time = value ? Date.parse(value) : NaN;
+        return Number.isFinite(time) && handledResets.get(key) !== time ? [{ key, time }] : [];
+      });
+      const scheduleReset = () => {
+        clearTimeout(resetTimer);
+        resetTimer = undefined;
+        if (!consumers || disposed) return;
+        const times = resetTimes();
+        if (!times.length) return;
+        const next = Math.min(...times.map(({ time }) => time));
+        resetTimer = setTimeout(() => {
+          resetTimer = undefined;
+          const due = resetTimes().filter(({ time }) => time <= Date.now());
+          // Mark before querying: an unchanged expired timestamp must not cause a loop.
+          for (const { key, time } of due) handledResets.set(key, time);
+          if (due.length) void refresh(true, Math.max(...due.map(({ time }) => time)));
+          scheduleReset();
+        }, Math.min(2147483647, Math.max(0, next - Date.now())));
+      };
+      const refresh = (force = false, notBefore = Date.now()) => {
+        if (!consumers || disposed) return Promise.resolve();
+        if (activeRequest) {
+          // A reset during an older request needs a fresh query after that request finishes.
+          queuedForce ||= force && (!activeRequest.force || activeRequest.startedAt < notBefore);
+          return activeRequest.promise;
+        }
+        const controller = new AbortController();
+        const request = { controller, force, startedAt: Date.now(), promise: undefined };
+        if (force) for (const { key, time } of resetTimes()) {
+          if (time <= request.startedAt) handledResets.set(key, time);
+        }
+        activeRequest = request;
+        publish({ ...state, refreshing: true });
+        request.promise = (async () => {
+          let value;
+          try {
+            for (let attempt = 0; attempt < 3 && !controller.signal.aborted; attempt++) {
+              try {
+                const response = await fetch(`${apiPath}${force || attempt > 0 ? '?refresh=1' : ''}`, {
+                  method: 'GET', credentials: 'same-origin', headers: { accept: 'application/json' }, signal: controller.signal,
+                });
+                if (!response.ok) throw new Error('Codex usage request failed.');
+                value = normalizeSnapshot(await response.json());
+              } catch { value = null; }
+              if (controller.signal.aborted || value?.status === 'ok' || value?.status === 'not-authenticated') break;
+              if (attempt < 2) await new Promise((resolve) => {
+                const finish = () => { clearTimeout(timer); controller.signal.removeEventListener('abort', finish); resolve(); };
+                const timer = setTimeout(finish, attempt === 0 ? 1000 : 3000);
+                controller.signal.addEventListener('abort', finish, { once: true });
+                if (controller.signal.aborted) finish();
+              });
+            }
+            if (!controller.signal.aborted && activeRequest === request) {
+              const result = value ?? { status: 'unavailable', windows: { fiveHour: null, weekly: null } };
+              const previous = state.snapshot;
+              const snapshot = result.status !== 'ok' && result.status !== 'not-authenticated' && (previous?.windows.fiveHour || previous?.windows.weekly)
+                ? { ...result, windows: previous.windows, stale: true } : result;
+              publish({ snapshot, refreshing: true });
+              scheduleReset();
+            }
+          } finally {
+            if (activeRequest === request) {
+              activeRequest = undefined;
+              if (queuedForce && consumers && !disposed) {
+                queuedForce = false;
+                void refresh(true);
+              } else publish({ ...state, refreshing: false });
+            }
+          }
+        })();
+        return request.promise;
+      };
+      const schedulePoll = () => {
+        clearInterval(pollTimer);
+        pollTimer = undefined;
+        if (pollers) pollTimer = setInterval(() => { void refresh(true); }, intervalMs);
+      };
+      const syncInterval = () => {
+        const next = readInterval();
+        if (next !== intervalMs) { intervalMs = next; schedulePoll(); }
+      };
+      const refreshOnChange = () => { void refresh(false); };
+      const stop = () => {
+        clearInterval(pollTimer); pollTimer = undefined;
+        clearTimeout(resetTimer); resetTimer = undefined;
+        window.removeEventListener('dsh-codex-usage-change', refreshOnChange);
+        window.removeEventListener('dsh-codex-usage-preferences-change', syncInterval);
+        window.removeEventListener('storage', syncInterval);
+        cancel();
+      };
+      return {
+        getSnapshot: () => state,
+        subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+        refresh, cancel,
+        logout() {
+          cancel();
+          clearTimeout(resetTimer); resetTimer = undefined;
+          handledResets.clear();
+          publish({ snapshot: { status: 'not-authenticated', windows: { fiveHour: null, weekly: null } }, refreshing: false });
+        },
+        retain(poll) {
+          if (disposed) return () => {};
+          consumers++;
+          if (poll) pollers++;
+          if (consumers === 1) {
+            intervalMs = readInterval();
+            window.addEventListener('dsh-codex-usage-change', refreshOnChange);
+            window.addEventListener('dsh-codex-usage-preferences-change', syncInterval);
+            window.addEventListener('storage', syncInterval);
+            void refresh(false);
+            scheduleReset();
+          }
+          if (poll && pollers === 1) schedulePoll();
+          let released = false;
+          return () => {
+            if (released || disposed) return;
+            released = true;
+            consumers--;
+            if (poll && --pollers === 0) schedulePoll();
+            if (!consumers) stop();
+          };
+        },
+        dispose() { disposed = true; consumers = 0; pollers = 0; stop(); listeners.clear(); },
+      };
+    }
+    const usageStore = createUsageStore();
 
     function DockUsage({ snapshot, preferences, t, statusMessage, card }) {
       const [open, setOpen] = React.useState(false);
@@ -244,8 +387,8 @@ window.__ModuleLoader__.load({
         `${t(label)} ${percent === undefined ? t('unavailable') : t('used', { percent })}`)].filter(Boolean).join(' · ');
       return h('span', { ref: rootRef, className: 'dcu-dock', onBlur: (event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); } },
         h('style', null, `
-          [data-composer-dock]:has(.dcu-dock) { width: 100%; max-width: var(--dsh-composer-card-max-width, 100%); flex-wrap: wrap; }
-          .dcu-dock, [data-composer-dock] > :has(> .dcu-dock) { order: 1000; margin-inline-start: auto; }
+          [data-composer-dock]:has(.dcu-dock) { flex-wrap: wrap; }
+          .dcu-dock, [data-composer-dock] > :has(> .dcu-dock) { order: 1000; }
           .dcu-dock { display: inline-flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
           .dcu-dock-trigger { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; max-width: 100%; padding: 1px 8px; border: 0; border-radius: var(--dsw-radius-sm, 5px); background: transparent; color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary, inherit)); font: inherit; font-size: var(--dsh-content-font-size-secondary, 13px); line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px)); font-variant-numeric: tabular-nums; cursor: pointer; }
           .dcu-dock-trigger:hover, .dcu-dock-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary, inherit); }
@@ -273,8 +416,8 @@ window.__ModuleLoader__.load({
     }
 
     function AppServerCard({ wide, t, settings = false, dock = false }) {
-      const [snapshot, setSnapshot] = React.useState(null);
-      const [refreshing, setRefreshing] = React.useState(false);
+      const { snapshot, refreshing } = React.useSyncExternalStore(usageStore.subscribe, usageStore.getSnapshot);
+      const refresh = usageStore.refresh;
       const [login, setLogin] = React.useState({ phase: 'loading' });
       const [callbackUrl, setCallbackUrl] = React.useState('');
       const [interval, setIntervalMs] = React.useState(readInterval);
@@ -303,52 +446,7 @@ window.__ModuleLoader__.load({
       const loginWindow = React.useRef(null);
       const initialAuthRequest = React.useRef(null);
       const authVersion = React.useRef(0);
-      const activeRequest = React.useRef(null);
       const locale = document.documentElement.lang || undefined;
-
-      const load = React.useCallback(async (refresh, signal) => {
-        const query = refresh ? '?refresh=1' : '';
-        const response = await fetch(`${apiPath}${query}`, {
-          method: 'GET',
-          credentials: 'same-origin',
-          headers: { accept: 'application/json' },
-          signal,
-        });
-        if (!response.ok) throw new Error('Codex usage request failed.');
-        return normalizeSnapshot(await response.json());
-      }, []);
-
-      const refresh = React.useCallback(async (force = false) => {
-        activeRequest.current?.abort();
-        const controller = new AbortController();
-        activeRequest.current = controller;
-        setRefreshing(true);
-        let value;
-        try {
-          for (let attempt = 0; attempt < 3 && !controller.signal.aborted; attempt++) {
-            try { value = await load(force || attempt > 0, controller.signal); }
-            catch { value = null; }
-            if (controller.signal.aborted || value?.status === 'ok' || value?.status === 'not-authenticated') break;
-            if (attempt < 2) await new Promise((resolve) => {
-              const finish = () => { clearTimeout(timer); controller.signal.removeEventListener('abort', finish); resolve(); };
-              const timer = setTimeout(finish, attempt === 0 ? 1000 : 3000);
-              controller.signal.addEventListener('abort', finish, { once: true });
-              if (controller.signal.aborted) finish();
-            });
-          }
-          if (!controller.signal.aborted) {
-            const result = value ?? { status: 'unavailable', windows: { fiveHour: null, weekly: null } };
-            setSnapshot((previous) => result.status !== 'ok' && result.status !== 'not-authenticated' && previous?.windows && (previous.windows.fiveHour || previous.windows.weekly)
-              ? { ...result, windows: previous.windows, stale: true }
-              : result);
-          }
-        } finally {
-          if (activeRequest.current === controller) {
-            activeRequest.current = null;
-            setRefreshing(false);
-          }
-        }
-      }, [load]);
 
       React.useEffect(() => {
         const sync = () => {
@@ -368,24 +466,13 @@ window.__ModuleLoader__.load({
 
       const shouldFetch = settings || (dock ? dockSettings.showFiveHour || dockSettings.showWeekly : displaySettings.enabled);
       React.useEffect(() => {
-        if (!shouldFetch) return;
-        void refresh(false);
-        if (settings) return () => { activeRequest.current?.abort(); activeRequest.current = null; };
-        const refreshOnChange = () => { void refresh(false); };
-        window.addEventListener('dsh-codex-usage-change', refreshOnChange);
-        const timer = setInterval(() => { void refresh(true); }, interval);
-        return () => {
-          clearInterval(timer);
-          window.removeEventListener('dsh-codex-usage-change', refreshOnChange);
-          activeRequest.current?.abort();
-          activeRequest.current = null;
-        };
-      }, [refresh, interval, settings, shouldFetch]);
+        if (shouldFetch) return usageStore.retain(!settings);
+      }, [settings, shouldFetch]);
 
       const authAction = React.useCallback(async (action, input) => {
         const version = ++authVersion.current;
         initialAuthRequest.current?.abort();
-        if (action === 'logout') activeRequest.current?.abort();
+        if (action === 'logout') usageStore.cancel();
         try {
           const response = await fetch(`${apiPath}/auth?action=${action}`, { method: 'POST', credentials: 'same-origin', ...(action === 'submit' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value: input }) } : {}) });
           if (!response.ok) throw new Error('Authentication failed');
@@ -393,11 +480,7 @@ window.__ModuleLoader__.load({
           if (version !== authVersion.current) return;
           authVersion.current++;
           setLogin(value);
-          if (action === 'logout') {
-            activeRequest.current?.abort();
-            setSnapshot({ status: 'not-authenticated', windows: { fiveHour: null, weekly: null } });
-            signalChange();
-          }
+          if (action === 'logout') usageStore.logout();
         } catch {
           if (version === authVersion.current) setLogin((previous) => ({ ...previous, error: action === 'logout' ? 'logoutFailed' : 'loginFailed', ...(action === 'start' ? { phase: 'failed' } : {}) }));
         }
@@ -439,7 +522,7 @@ window.__ModuleLoader__.load({
             const value = await response.json();
             if (controller.signal.aborted || version !== authVersion.current) return;
             setLogin(value);
-            if (value.phase === 'authenticated') { await refresh(true); signalChange(); }
+            if (value.phase === 'authenticated') await refresh(true);
           } catch { if (!controller.signal.aborted && version === authVersion.current) setLogin((previous) => ({ ...previous, error: 'authStatusFailed' })); }
         }, 2000);
         return () => { clearInterval(timer); controller.abort(); };
@@ -551,7 +634,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dcu-settings-copy' },
             h('span', { className: 'dcu-settings-label' }, t('refreshTitle')),
             h('p', { className: 'dcu-settings-description' }, t('refreshHint'))),
-          h('button', { className: 'dcu-settings-button dcu-settings-control', type: 'button', disabled: refreshing, onClick: () => { void refresh(true).then(signalChange); } }, t('refresh'))),
+          h('button', { className: 'dcu-settings-button dcu-settings-control', type: 'button', disabled: refreshing, onClick: () => { void refresh(true); } }, t('refresh'))),
       );
 
       // Treat a recognized weekly window without a 5-hour window as a plan with no 5-hour limit.
@@ -705,6 +788,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
+        ctx.effect(() => () => usageStore.dispose(), 'dsh-codex-usage: shared refresh');
         ctx.effect(
           () => ctx.locale.register(namespace, dictionaries),
           'dsh-codex-usage: dictionaries',

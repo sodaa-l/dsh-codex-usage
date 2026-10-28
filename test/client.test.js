@@ -16,6 +16,7 @@ test('registers settings and sidebar; persists display switches and handles week
       if (initial === null) return [snapshot, () => {}];
       return [typeof initial === 'function' ? initial() : initial, () => {}];
     },
+    useSyncExternalStore: () => ({ snapshot, refreshing: false }),
     useRef: (current) => ({ current }), useCallback: (fn) => fn, useEffect: () => {},
   };
   const stored = new Map();
@@ -107,6 +108,7 @@ test('disabling the sidebar hides the card and stops its request timer', async (
   const React = {
     createElement(type, props, ...children) { return typeof type === 'function' ? type({ ...props, children }) : { type, props: props ?? {}, children }; },
     useState(initial) { return [typeof initial === 'function' ? initial() : initial, () => {}]; },
+    useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
     useRef: (current) => ({ current }), useCallback: (fn) => fn, useEffect: (fn) => effects.push(fn),
   };
   const window = {
@@ -117,7 +119,7 @@ test('disabling the sidebar hides the card and stops its request timer', async (
     dispatchEvent: () => true,
   };
   vm.runInNewContext(source, { window, document: { documentElement: { lang: 'zh' } }, Event, Intl, AbortController,
-    setInterval: () => { intervalCalls++; return intervalCalls; }, clearInterval: () => { clearedIntervals++; },
+    setInterval: () => { intervalCalls++; return intervalCalls; }, clearInterval: (id) => { if (id !== undefined) clearedIntervals++; },
     setTimeout, clearTimeout,
     fetch: async () => { fetchCalls++; return { ok: true, json: async () => ({ status: 'ok', windows: { fiveHour: null, weekly: null } }) }; },
   });
@@ -173,6 +175,7 @@ test('refresh retries failures and keeps last successful windows marked stale', 
   const React = {
     createElement(type, props, ...children) { return typeof type === 'function' ? type({ ...props, children }) : { type, props: props ?? {}, children }; },
     useState(initial) { const i = cursor++; if (!(i in hooks)) hooks[i] = typeof initial === 'function' ? initial() : initial; return [hooks[i], (v) => { hooks[i] = typeof v === 'function' ? v(hooks[i]) : v; }]; },
+    useSyncExternalStore(_subscribe, getSnapshot) { cursor++; return getSnapshot(); },
     useRef(initial) { const i = cursor++; return hooks[i] ??= { current: initial }; },
     useCallback(fn) { cursor++; return fn; },
     useEffect(fn) { cursor++; effects.push(fn); },

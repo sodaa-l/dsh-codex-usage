@@ -21,6 +21,7 @@ function harness() {
       if (!(i in hooks)) hooks[i] = initial === null ? snapshot : typeof initial === 'function' ? initial() : initial;
       return [hooks[i], (next) => { hooks[i] = typeof next === 'function' ? next(hooks[i]) : next; }];
     },
+    useSyncExternalStore() { cursor++; return { snapshot, refreshing: false }; },
     useRef(current) { const i = cursor++; return hooks[i] ??= { current }; },
     useCallback(fn) { cursor++; return fn; },
     useId() { return `panel-${cursor++}`; },
@@ -37,7 +38,7 @@ function harness() {
   vm.runInNewContext(source, {
     window, document: { documentElement: { lang: 'zh' }, addEventListener: add, removeEventListener: remove },
     Intl, Event, AbortController, setTimeout, clearTimeout,
-    setInterval: () => ++timers, clearInterval: () => { cleared++; },
+    setInterval: () => ++timers, clearInterval: (id) => { if (id !== undefined) cleared++; },
     fetch: async () => { calls++; return { ok: true, json: async () => snapshot }; },
   });
   plugin.apply({ effect: (fn) => fn(), locale: { register() {}, bind: () => (key, vars) => vars?.percent === undefined ? key : `${key}:${vars.percent}` }, slots: { inject: (_name, fn) => fn(), register: (options, component) => registrations.set(options.name, { options, component }) } });
@@ -63,6 +64,9 @@ test('footer stays independent of sidebar and renders remaining limits with inde
   assert.deepEqual(find(tree, (node) => node.props.className === 'dcu-dock-percent').map((node) => node.children[0]), ['76%', '55%']);
   assert.doesNotMatch(JSON.stringify(tree), /resetAt|resetUnknown/);
   assert.match(JSON.stringify(tree), /dockFiveHourShort/);
+  const css = find(tree, (node) => node.type === 'style').map((node) => node.children.join('')).join('');
+  assert.match(css, /order: 1000/);
+  assert.doesNotMatch(css, /margin-inline-start: auto|dsh-composer-card-max-width/);
   assert.match(JSON.stringify(tree), /dockWeeklyShort/);
   assert.equal(find(tree, (node) => node.props.className === 'dcu-dock-limit').length, 2);
   assert.equal(find(tree, (node) => node.children?.includes('・')).length, 1);

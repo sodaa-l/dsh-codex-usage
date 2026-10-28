@@ -10,6 +10,7 @@ async function settingsHarness(fetchImpl) {
   const React = {
     createElement(type, props, ...children) { return typeof type === 'function' ? type({ ...props, children }) : { type, props: props ?? {}, children }; },
     useState(initial) { const i = cursor++; if (!(i in hooks)) hooks[i] = typeof initial === 'function' ? initial() : initial; return [hooks[i], (v) => { hooks[i] = typeof v === 'function' ? v(hooks[i]) : v; }]; },
+    useSyncExternalStore(_subscribe, getSnapshot) { cursor++; return getSnapshot(); },
     useRef(initial) { const i = cursor++; return hooks[i] ??= { current: initial }; },
     useCallback(fn) { cursor++; return fn; },
     useEffect(fn) { cursor++; effects.push(fn); },
@@ -88,7 +89,7 @@ test('failed logout keeps account and retry button; successful logout clears usa
   await tick();
   ui.button('login');
   assert.equal(usageCalls, 1);
-  assert.equal(ui.changes(), 1);
+  assert.equal(ui.changes(), 0);
   assert.doesNotMatch(JSON.stringify(ui.render()), /accountConnected|test@example.com|logoutFailed/);
 });
 
